@@ -2,114 +2,69 @@ import React, { useEffect } from "react";
 import logoImage from "../assets/logo.png";
 
 const SplashScreen = ({ onDone }) => {
-  // Simulate loading for 2 seconds, then call onDone
   useEffect(() => {
-    const timer = setTimeout(onDone, 2000);
+    const timer = setTimeout(onDone, 3000);
     return () => clearTimeout(timer);
   }, [onDone]);
 
   return (
-    <div className="splash-screen-container">
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-black via-gray-900 to-black text-white z-[2000] p-6 overflow-hidden">
+      {/* Logo */}
       <img
         src={logoImage}
         alt="XStream Secrets Logo"
-        className="splash-logo"
+        className="w-56 md:w-72 rounded-3xl shadow-[0_0_25px_rgba(255,255,255,0.1)] mb-8 select-none animate-fade-in"
       />
-      <h1 className="splash-title">
+
+      {/* Title */}
+      <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-red-500 tracking-wide mb-3 animate-slide-down">
         XStream (18+)
       </h1>
-      <p className="splash-subtitle">
-        Welcome to XStream, the adult video embed platform.
+
+      {/* Subtitle */}
+      <p className="text-gray-300 text-base sm:text-lg mb-2 animate-fade-in">
+        Welcome to <span className="text-white font-semibold">XStream</span>, the adult video embed platform.
       </p>
-      <p className="splash-warning">
-        <strong>Warning:</strong> This platform is for adults (18+) only.
+
+      {/* Warning */}
+      <p className="text-red-400 text-sm sm:text-base mt-4 text-center animate-fade-in">
+        ⚠️ <strong>Warning:</strong> This platform is for adults (18+) only.
       </p>
+
       {/* Loading bar */}
-      <div className="splash-loading-bar-container">
-        <div className="splash-loading-bar" />
+      <div className="w-44 sm:w-56 h-3 bg-gray-800 rounded-full mt-10 overflow-hidden shadow-inner animate-fade-in">
+        <div className="h-full bg-gradient-to-r from-red-600 to-pink-500 rounded-full animate-loading-bar" />
       </div>
-      <style>{`
-        .splash-screen-container {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: #000;
-          color: #fff;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          z-index: 2000;
-          padding: 20px; /* Added padding */
-          box-sizing: border-box;
-          overflow: hidden;
-        }
-        .splash-logo {
-          width: min(90vw, 340px);
-          border-radius: 24px;
-          box-shadow: 0 2px 16px #0008;
-          margin-bottom: 32px;
-          max-width: 100%;
-          display: block;
-        }
-        .splash-title {
-          color: #d7263d;
-          margin-bottom: 12px;
-          font-size: 40px;
-          font-weight: 700;
-          text-align: center;
-        }
-        .splash-subtitle {
-          font-size: 20px;
-          margin-bottom: 0;
-          text-align: center;
-        }
-        .splash-warning {
-          font-size: 15px;
-          color: #d7263d;
-          margin-top: 32px;
-          text-align: center;
-        }
-        .splash-loading-bar-container {
-          width: 180px;
-          height: 10px;
-          background: #222;
-          border-radius: 8px;
-          margin-top: 40px;
-          overflow: hidden;
-          box-shadow: 0 2px 12px #0006;
-        }
-        .splash-loading-bar {
-          height: 100%;
-          width: 0%;
-          background: linear-gradient(90deg, #d7263d 40%, #ff4e8e 100%);
-          border-radius: 8px;
-          animation: splash-bar-load 2s linear forwards;
-        }
-        @keyframes splash-bar-load {
-          from { width: 0%; }
-          to { width: 100%; }
-        }
-        @media (max-width: 600px) {
-          .splash-logo {
-            width: 80vw;
-            max-width: 220px; /* Adjusted for better visibility */
-            margin-bottom: 24px;
+
+      {/* Animations */}
+      <style>
+        {`
+          @keyframes fade-in {
+            0% { opacity: 0; transform: scale(0.98); }
+            100% { opacity: 1; transform: scale(1); }
           }
-          .splash-title {
-            font-size: 28px;
+          @keyframes slide-down {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
           }
-          .splash-subtitle {
-            font-size: 16px;
+          @keyframes loading-bar {
+            0% { width: 0%; }
+            100% { width: 100%; }
           }
-           .splash-warning {
-            font-size: 14px;
-            margin-top: 24px;
+
+          .animate-fade-in {
+            animation: fade-in 1s ease-in-out forwards;
           }
-        }
-      `}</style>
+
+          .animate-slide-down {
+            animation: slide-down 0.8s ease-out forwards;
+          }
+
+          .animate-loading-bar {
+            animation: loading-bar 2s linear forwards;
+          }
+        `}
+      </style>
     </div>
   );
 };

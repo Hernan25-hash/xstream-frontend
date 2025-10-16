@@ -1,22 +1,39 @@
 import React, { useState } from "react";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { app } from "../firebase";
 
-// Simple eye icon SVGs
+// 👁 Simple icons
 const EyeOpen = ({ style = {} }) => (
   <svg style={style} width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#888" strokeWidth="2" fill="none"/>
-    <circle cx="12" cy="12" r="3" stroke="#888" strokeWidth="2" fill="none"/>
-  </svg>
-);
-const EyeClosed = ({ style = {} }) => (
-  <svg style={style} width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M17.94 17.94C16.13 19.24 14.13 20 12 20c-7 0-11-8-11-8a21.77 21.77 0 0 1 5.06-6.06M22.54 6.42A21.77 21.77 0 0 1 23 12s-4 8-11 8a10.94 10.94 0 0 1-4.06-.81M1 1l22 22" stroke="#888" strokeWidth="2" fill="none"/>
+    <path
+      d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"
+      stroke="#888"
+      strokeWidth="2"
+      fill="none"
+    />
+    <circle cx="12" cy="12" r="3" stroke="#888" strokeWidth="2" fill="none" />
   </svg>
 );
 
+const EyeClosed = ({ style = {} }) => (
+  <svg style={style} width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M17.94 17.94C16.13 19.24 14.13 20 12 20c-7 0-11-8-11-8a21.77 21.77 0 0 1 5.06-6.06M22.54 6.42A21.77 21.77 0 0 1 23 12s-4 8-11 8a10.94 10.94 0 0 1-4.06-.81M1 1l22 22"
+      stroke="#888"
+      strokeWidth="2"
+      fill="none"
+    />
+  </svg>
+);
+
+// 🔥 Firebase
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -29,21 +46,27 @@ const Login = ({ onSuccess }) => {
   const [isRegister, setIsRegister] = useState(false);
   const navigate = useNavigate();
 
-  // Registration handler
+  // 🧾 Register new user (you can manually change role in Firestore)
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
+
       await setDoc(doc(db, "users", user.uid), {
         email: user.email,
-        createdAt: new Date(),
-        role: "user",
-        status: "active"
+        role: "user", // default non-admin
+        status: "active",
+        createdAt: new Date().toISOString(),
       });
-      setSuccess("Registration successful! You can now login.");
+
+      setSuccess("Registration successful! You can now log in.");
       setIsRegister(false);
       setEmail("");
       setPassword("");
@@ -52,20 +75,36 @@ const Login = ({ onSuccess }) => {
     }
   };
 
-  // Login handler (only allow admin)
+  // 🔐 Login (Admin only)
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
-      // Check role in Firestore
+
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists() || userDoc.data().role !== "admin") {
-        setError("Access denied. Only admin users can login.");
+      if (!userDoc.exists()) {
+        setError("User not found in database.");
+        await signOut(auth);
         return;
       }
+
+      const data = userDoc.data();
+      if (data.role !== "admin") {
+        setError("Access denied. Only admin users can log in.");
+        await signOut(auth);
+        return;
+      }
+
+      // ✅ Save login state
+      localStorage.setItem("xstream-admin-loggedin", "true");
+
       setSuccess("Login successful! Redirecting...");
       if (onSuccess) onSuccess();
       navigate("/admin");
@@ -84,7 +123,6 @@ const Login = ({ onSuccess }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 0,
       }}
     >
       <form
@@ -99,70 +137,76 @@ const Login = ({ onSuccess }) => {
           boxShadow: "0 4px 24px 0 #0006",
           display: "flex",
           flexDirection: "column",
-          gap: 0,
         }}
       >
-        <h2 style={{ marginBottom: 24, fontSize: 32, fontWeight: 700, textAlign: "center" }}>
+        <h2
+          style={{
+            marginBottom: 24,
+            fontSize: 28,
+            fontWeight: 700,
+            textAlign: "center",
+            color: "#e60073",
+          }}
+        >
           {isRegister ? "Register" : "Admin Login"}
         </h2>
-        <div style={{ marginBottom: 16 }}>
+
+        {/* Email */}
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          style={{
+            width: "100%",
+            padding: 14,
+            borderRadius: 8,
+            border: "none",
+            fontSize: 17,
+            marginBottom: 12,
+            background: "#333",
+            color: "#fff",
+          }}
+        />
+
+        {/* Password with toggle */}
+        <div style={{ position: "relative", marginBottom: 16 }}>
           <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
             style={{
               width: "100%",
-              padding: 14,
+              padding: "14px 44px 14px 14px",
               borderRadius: 8,
               border: "none",
               fontSize: 17,
-              boxSizing: "border-box",
-              marginBottom: 12,
+              background: "#333",
+              color: "#fff",
             }}
           />
-          <div style={{ position: "relative" }}>
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              style={{
-                width: "100%",
-                padding: "14px 44px 14px 14px",
-                borderRadius: 8,
-                border: "none",
-                fontSize: 17,
-                boxSizing: "border-box",
-              }}
-            />
-            <button
-              type="button"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword((v) => !v)}
-              style={{
-                position: "absolute",
-                right: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                padding: 0,
-                margin: 0,
-                cursor: "pointer",
-                outline: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-              tabIndex={-1}
-            >
-              {showPassword ? <EyeOpen /> : <EyeClosed />}
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            onClick={() => setShowPassword((v) => !v)}
+            style={{
+              position: "absolute",
+              right: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            {showPassword ? <EyeOpen /> : <EyeClosed />}
+          </button>
         </div>
+
+        {/* Submit */}
         <button
           type="submit"
           style={{
@@ -173,55 +217,32 @@ const Login = ({ onSuccess }) => {
             border: "none",
             borderRadius: 8,
             fontWeight: 700,
-            fontSize: 20,
-            marginTop: 8,
+            fontSize: 18,
             cursor: "pointer",
-            transition: "background 0.2s",
-            boxShadow: "0 2px 8px #0003"
+            transition: "background 0.3s",
           }}
         >
           {isRegister ? "Register" : "Login"}
         </button>
-        <div style={{ marginTop: 18, textAlign: "center" }}>
-          {isRegister ? (
-            <span>
-              Already have an account?{" "}
-              <button type="button" style={{ color: "#e60073", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }} onClick={() => setIsRegister(false)}>
-                Login
-              </button>
-            </span>
-          ) : (
-            <span>
-              No account?{" "}
-              <button type="button" style={{ color: "#e60073", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }} onClick={() => setIsRegister(true)}>
-                Register
-              </button>
-            </span>
-          )}
-        </div>
-        {error && <div style={{ color: "#ff4d4f", marginTop: 18, textAlign: "center" }}>{error}</div>}
-        {success && <div style={{ color: "#4caf50", marginTop: 18, textAlign: "center" }}>{success}</div>}
+
+     
+
+        {/* Messages */}
+        {error && (
+          <div
+            style={{ color: "#ff4d4f", marginTop: 18, textAlign: "center" }}
+          >
+            {error}
+          </div>
+        )}
+        {success && (
+          <div
+            style={{ color: "#4caf50", marginTop: 18, textAlign: "center" }}
+          >
+            {success}
+          </div>
+        )}
       </form>
-      <style>{`
-        @media (max-width: 600px) {
-          .login-form {
-            padding: 14px !important;
-            border-radius: 10px !important;
-            max-width: 98vw !important;
-          }
-          .login-form h2 {
-            font-size: 22px !important;
-          }
-          .login-form input {
-            font-size: 15px !important;
-            padding: 10px !important;
-          }
-          .login-form button {
-            font-size: 16px !important;
-            padding: 12px !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };

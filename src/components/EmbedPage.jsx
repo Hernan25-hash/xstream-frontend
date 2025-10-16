@@ -1,47 +1,136 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { Helmet } from "react-helmet";
 import { useParams, useNavigate } from "react-router-dom";
-import { 
-  getFirestore, doc, getDoc, collection, onSnapshot, 
-  updateDoc, increment, arrayUnion, addDoc, Timestamp, query, orderBy 
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  collection,
+  onSnapshot,
+  updateDoc,
+  increment,
+  arrayUnion,
+  addDoc,
+  Timestamp,
+  query,
+  orderBy,
 } from "firebase/firestore";
 import { app } from "../firebase";
-import { TopNav, VideoGrid } from "./Dashboard";
-import { FaEye, FaHeart, FaComment } from 'react-icons/fa';
-import Footer from './Footer'; // Import the Footer component
+import {
+  FaEye,
+  FaHeart,
+  FaComment,
+  FaShare,
+  FaArrowLeft,
+  FaClipboard,
+} from "react-icons/fa";
+import Footer from "./Footer";
 
-// Function to generate a persistent guest ID
+// ✅ Generate persistent guest ID
 const getGuestId = () => {
   let guestId = localStorage.getItem("xstreamGuestId");
   if (!guestId) {
-    guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    guestId = `guest_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     localStorage.setItem("xstreamGuestId", guestId);
   }
   return guestId;
 };
 
-const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubmit }) => {
-  const formatGuestName = (id) => {
-    if (!id) return "Guest";
-    return `Guest-${id.substring(6, 12)}`;
+// ✅ CommentSection component
+const CommentSection = ({
+  comments,
+  newComment,
+  setNewComment,
+  handleCommentSubmit,
+  db,
+  videoId,
+  guestId,
+}) => {
+  const [replyInputs, setReplyInputs] = useState({});
+  const formatGuestName = (id) =>
+    id ? `Guest-${id.substring(6, 12)}` : "Guest";
+
+  const handleReplyChange = (commentId, text) =>
+    setReplyInputs((prev) => ({ ...prev, [commentId]: text }));
+
+  const handleReplySubmit = async (e, commentId) => {
+    e.preventDefault();
+    const replyText = replyInputs[commentId];
+    if (!replyText?.trim()) return;
+    const commentRef = doc(db, "videos", videoId, "comments", commentId);
+    await updateDoc(commentRef, {
+      replies: arrayUnion({
+        text: replyText,
+        author: guestId,
+        createdAt: Timestamp.now(),
+      }),
+    });
+    setReplyInputs((prev) => ({ ...prev, [commentId]: "" }));
   };
 
   return (
-    <div className="comment-section">
-      <h3>Comments ({comments.length})</h3>
-      <form onSubmit={handleCommentSubmit} className="comment-form">
+    <div className="mt-6">
+      <h3 className="text-lg font-semibold mb-2">
+        Comments ({comments.length})
+      </h3>
+      <form
+        onSubmit={handleCommentSubmit}
+        className="flex flex-col sm:flex-row gap-2 mb-4"
+      >
         <input
           type="text"
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           placeholder="Add a comment..."
+          className="flex-1 p-2 rounded bg-gray-800 border border-gray-600 text-white"
         />
-        <button type="submit">Post</button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-pink-600 rounded text-white"
+        >
+          Post
+        </button>
       </form>
-      <div className="comment-list">
-        {comments.map(comment => (
-          <div key={comment.id} className="comment-item">
-            <p className="comment-author">{formatGuestName(comment.author)}</p>
-            <p className="comment-text">{comment.text}</p>
+      <div className="space-y-3">
+        {comments.map((comment) => (
+          <div key={comment.id} className="bg-gray-900 p-3 rounded">
+            <p className="text-sm text-pink-400 font-semibold">
+              {formatGuestName(comment.author)}
+            </p>
+            <p className="text-sm text-white">{comment.text}</p>
+
+            <div className="mt-2 ml-4 space-y-2">
+              {comment.replies?.map((reply, idx) => (
+                <div key={idx} className="bg-gray-800 p-2 rounded">
+                  <p className="text-xs text-pink-400 font-semibold">
+                    {formatGuestName(reply.author)}
+                  </p>
+                  <p className="text-xs text-white">{reply.text}</p>
+                </div>
+              ))}
+              <form
+                onSubmit={(e) => handleReplySubmit(e, comment.id)}
+                className="flex gap-2 mt-1"
+              >
+                <input
+                  type="text"
+                  value={replyInputs[comment.id] || ""}
+                  onChange={(e) =>
+                    handleReplyChange(comment.id, e.target.value)
+                  }
+                  placeholder="Reply..."
+                  className="flex-1 p-1 rounded bg-gray-800 border border-gray-600 text-white text-xs"
+                />
+                <button
+                  type="submit"
+                  className="px-2 py-1 bg-pink-600 rounded text-white text-xs"
+                >
+                  Reply
+                </button>
+              </form>
+            </div>
           </div>
         ))}
       </div>
@@ -49,6 +138,7 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
   );
 };
 
+// ✅ Main Embed Page
 const EmbedPage = () => {
   const { id } = useParams();
   const db = getFirestore(app);
@@ -56,18 +146,16 @@ const EmbedPage = () => {
 
   const [video, setVideo] = useState(null);
   const [videos, setVideos] = useState([]);
-  const [search, setSearch] = useState("");
-  const [showCategories, setShowCategories] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-  
   const guestId = useMemo(() => getGuestId(), []);
   const [hasLiked, setHasLiked] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const shareRef = React.useRef(null);
 
-  // Effect for fetching video data and incrementing views
+  // ✅ Fetch video
   useEffect(() => {
     if (!id) return;
     const videoRef = doc(db, "videos", id);
@@ -78,425 +166,305 @@ const EmbedPage = () => {
         const videoData = snap.data();
         setVideo({ ...videoData, id: snap.id });
         setHasLiked(videoData.likedBy?.includes(guestId) || false);
-        
-        // Increment views
-        await updateDoc(videoRef, {
-          views: increment(1)
-        });
-      } else {
-        setVideo(null);
-      }
+        await updateDoc(videoRef, { views: increment(1) });
+      } else setVideo(null);
     };
-    
     fetchVideo();
     window.scrollTo(0, 0);
 
-    // Real-time listener for video updates (likes, etc.)
-    const unsubscribeVideo = onSnapshot(videoRef, (doc) => {
-        if (doc.exists()) {
-            const videoData = doc.data();
-            setVideo(prev => ({ ...prev, ...videoData }));
-            setHasLiked(videoData.likedBy?.includes(guestId) || false);
-        }
+    const unsubscribe = onSnapshot(videoRef, (doc) => {
+      if (doc.exists()) {
+        const videoData = doc.data();
+        setVideo((prev) => ({ ...prev, ...videoData }));
+        setHasLiked(videoData.likedBy?.includes(guestId) || false);
+      }
     });
 
-    return () => unsubscribeVideo();
+    return () => unsubscribe();
   }, [id, db, guestId]);
 
-  // Effect for fetching related videos
+  // ✅ Fetch all videos
   useEffect(() => {
     const q = collection(db, "videos");
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = onSnapshot(q, (snap) => {
       const vids = [];
-      querySnapshot.forEach((doc) => vids.push({ id: doc.id, ...doc.data() }));
+      snap.forEach((doc) => vids.push({ id: doc.id, ...doc.data() }));
       setVideos(vids);
     });
     return () => unsubscribe();
   }, [db]);
 
-  // Effect for fetching comments
+  // ✅ Fetch comments
   useEffect(() => {
     if (!id) return;
-    const commentsQuery = query(collection(db, "videos", id, "comments"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(commentsQuery, (querySnapshot) => {
+    const q = query(
+      collection(db, "videos", id, "comments"),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
       const commentsData = [];
-      querySnapshot.forEach(doc => commentsData.push({ id: doc.id, ...doc.data() }));
+      snap.forEach((doc) =>
+        commentsData.push({ id: doc.id, replies: [], ...doc.data() })
+      );
       setComments(commentsData);
     });
     return () => unsubscribe();
   }, [id, db]);
 
-  const handleNavClick = (link) => {
-    if (link === "HOME") navigate("/");
-    else if (link === "CATEGORIES") setShowCategories(v => !v);
-  };
-
-  useEffect(() => {
-    if (search || selectedCategory) {
-      navigate(`/?search=${search || ''}&category=${selectedCategory || ''}`);
-    }
-  }, [search, selectedCategory, navigate]);
-
+  // ✅ Handle Like
   const handleLike = async () => {
     if (!id || hasLiked) return;
-    const videoRef = doc(db, "videos", id);
-    await updateDoc(videoRef, {
+    const ref = doc(db, "videos", id);
+    await updateDoc(ref, {
       hearts: increment(1),
-      likedBy: arrayUnion(guestId)
+      likedBy: arrayUnion(guestId),
     });
     setHasLiked(true);
   };
 
+  // ✅ Submit Comment
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!id || newComment.trim() === "") return;
     await addDoc(collection(db, "videos", id, "comments"), {
       text: newComment,
       author: guestId,
-      createdAt: Timestamp.now()
+      createdAt: Timestamp.now(),
+      replies: [],
     });
     setNewComment("");
   };
 
-  if (!video) {
+  // ✅ Handle outside click (close share)
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (shareRef.current && !shareRef.current.contains(e.target))
+        setShareOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const relatedVideos = videos
+    .filter((v) => v.id !== id && v.category === video?.category)
+    .slice(0, 8);
+
+  if (!video)
     return (
-      <div className="loading-container">
-        <div className="spinner"></div>
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <div className="w-12 h-12 border-4 border-gray-500 border-t-pink-600 rounded-full animate-spin"></div>
       </div>
     );
-  }
 
-  const relatedVideos = videos.filter(v => v.id !== id && v.category === video.category).slice(0, 8);
-  const availableCategories = [...new Set(videos.map(v => v.category).filter(Boolean))];
+  // ✅ Page URL for SEO
+  const pageUrl = `https://xsecrets.xyz/embed/${video.id}`;
 
   return (
-    <div className="embed-page-layout">
-      <TopNav
-        search={search}
-        setSearch={setSearch}
-        handleNavClick={handleNavClick}
-        showCategories={showCategories}
-        availableCategories={availableCategories}
-        setSelectedCategory={setSelectedCategory}
-        setShowCategories={setShowCategories}
-        selectedCategory={selectedCategory}
-      />
+    <div className="bg-black text-white min-h-screen relative">
+      {/* ✅ Dynamic SEO Meta Tags */}
+      <Helmet>
+        <title>{video.description || "XStream Video"}</title>
+        <meta
+          name="description"
+          content={video.description || "Watch videos on XStream"}
+        />
+        <meta property="og:type" content="video.other" />
+        <meta property="og:url" content={pageUrl} />
+        <meta
+          property="og:title"
+          content={video.description || "XStream Video"}
+        />
+        <meta
+          property="og:description"
+          content={video.description || "Watch this video on XStream"}
+        />
+        <meta
+          property="og:image"
+          content={video.thumbnail || "https://xsecrets.xyz/logo.png"}
+        />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:video" content={video.url} />
+        <meta property="og:video:type" content="video/mp4" />
+        <meta property="og:video:width" content="1280" />
+        <meta property="og:video:height" content="720" />
+        <meta name="twitter:card" content="player" />
+        <meta name="twitter:title" content={video.description || "XStream"} />
+        <meta
+          name="twitter:description"
+          content={video.description || "Watch videos on XStream"}
+        />
+        <meta
+          name="twitter:image"
+          content={video.thumbnail || "https://xsecrets.xyz/logo.png"}
+        />
+        <meta name="twitter:player" content={pageUrl} />
+      </Helmet>
 
-      <div className="embed-page-main-content">
-        <div className="main-video-column">
-          <div className="embed-player-wrapper">
-            {/* Player code remains the same */}
-            {video.url && video.url.includes("<iframe") ? (
-              <div className="embed-iframe-container">
-                {(() => {
-                  const match = video.url.match(/src=["']([^"]+)["']/);
-                  if (match && match[1]) {
-                    return (
-                      <iframe
-                        src={match[1]}
-                        className="embed-iframe"
-                        allow="autoplay; fullscreen"
-                        sandbox="allow-scripts allow-same-origin allow-presentation"
-                        title="Embedded Video"
-                        scrolling="no"
-                      />
-                    );
-                  } else {
-                    return <div className="embed-error">Invalid or missing iframe src.</div>;
-                  }
-                })()}
-              </div>
-            ) : video.url ? (
-              <div className="embed-video-container">
-                <video src={video.url} controls autoPlay className="embed-video" />
-              </div>
+      {/* 🔙 Back Button */}
+      <button
+        className="fixed top-4 left-4 z-50 p-2 bg-gray-900 rounded-full shadow hover:bg-pink-600 transition text-white"
+        onClick={() => navigate("/")}
+      >
+        <FaArrowLeft />
+      </button>
+
+      {/* ✅ Layout */}
+      <div className="flex flex-col lg:flex-row max-w-screen-xl mx-auto p-4 lg:p-6 gap-6 pt-12 lg:pt-6">
+        {/* 🎥 Main Video */}
+        <div className="flex-1">
+          <div className="w-full aspect-video bg-black rounded overflow-hidden mb-4">
+            {video.url?.includes("<iframe") ? (
+              (() => {
+                const match = video.url.match(/src=["']([^"']+)["']/);
+                return match?.[1] ? (
+                  <iframe
+                    src={match[1]}
+                    className="w-full h-full border-0"
+                    allow="autoplay; fullscreen"
+                    sandbox="allow-scripts allow-same-origin allow-presentation"
+                    scrolling="no"
+                    title="Embedded Video"
+                  />
+                ) : (
+                  <div className="text-center text-sm">
+                    Invalid iframe src.
+                  </div>
+                );
+              })()
             ) : (
-              <div className="embed-error">Invalid video source.</div>
+              <video src={video.url} controls autoPlay className="w-full h-full" />
             )}
           </div>
 
-          <div className="video-title">
-              <h2>{video.description || "No Title"}</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            {video.description || "No Title"}
+          </h2>
+
+          {/* ❤️ Stats & Share */}
+          <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm mb-4">
+            <span className="flex items-center gap-1">
+              <FaEye /> {video.views || 0}
+            </span>
+            <span
+              className={`flex items-center gap-1 cursor-pointer ${
+                hasLiked ? "text-red-500" : ""
+              }`}
+              onClick={handleLike}
+            >
+              <FaHeart /> {video.hearts || 0}
+            </span>
+            <span
+              className="flex items-center gap-1 cursor-pointer"
+              onClick={() => setShowComments(!showComments)}
+            >
+              <FaComment /> {comments.length}
+            </span>
+
+            {/* 📤 Share */}
+            <span className="relative" ref={shareRef}>
+              <button
+                className="flex items-center gap-1 cursor-pointer px-2 py-1 bg-gray-800 rounded hover:bg-gray-700 transition"
+                onClick={() => setShareOpen((prev) => !prev)}
+              >
+                <FaShare /> Share
+              </button>
+              {shareOpen && (
+                <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 sm:left-0 sm:translate-x-0 w-56 sm:w-64 max-w-[90vw] bg-gray-900 border border-gray-700 rounded shadow-lg p-4 z-50">
+                  <h3 className="text-sm font-semibold text-pink-500 mb-2">
+                    Share this video
+                  </h3>
+                  <p className="text-gray-300 text-xs mb-2">
+                    Copy the link below or share it on social media.
+                  </p>
+                  <input
+                    type="text"
+                    readOnly
+                    value={window.location.href}
+                    className="w-full p-2 rounded bg-gray-800 border border-gray-600 text-white text-xs mb-2"
+                  />
+                  <button
+                    className="w-full px-3 py-2 bg-pink-600 rounded text-white text-xs flex items-center justify-center gap-2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      setCopySuccess(true);
+                      setTimeout(() => setCopySuccess(false), 2000);
+                    }}
+                  >
+                    <FaClipboard /> Copy Link
+                  </button>
+                  {copySuccess && (
+                    <p className="text-green-400 text-xs mt-1">
+                      Link copied!
+                    </p>
+                  )}
+                </div>
+              )}
+            </span>
           </div>
 
-          <div className="video-actions-bar">
-              <div className="video-stats">
-                  <div className="stat-item">
-                      <FaEye /> {video.views || 0}
-                  </div>
-                  <div className={`stat-item like-button ${hasLiked ? 'liked' : ''}`} onClick={handleLike}>
-                      <FaHeart /> {video.hearts || 0}
-                  </div>
-                  <div className="stat-item" onClick={() => setShowComments(!showComments)}>
-                      <FaComment /> {comments.length}
-                  </div>
-              </div>
-          </div>
-
+          {/* 💬 Comments */}
           {showComments && (
-            <CommentSection 
+            <CommentSection
               comments={comments}
               newComment={newComment}
               setNewComment={setNewComment}
               handleCommentSubmit={handleCommentSubmit}
+              db={db}
+              videoId={id}
+              guestId={guestId}
             />
           )}
         </div>
 
-        <div className="related-videos-sidebar">
-          <h2>Related Videos</h2>
-          <VideoGrid videos={relatedVideos} navigate={navigate} isSidebar={true} />
+        {/* 🎞️ Related Videos */}
+        <div className="w-full lg:w-1/3">
+          <h3 className="text-md font-semibold text-pink-500 mb-2">
+            Related Videos
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2">
+            {relatedVideos.map((v) => (
+              <div
+                key={v.id}
+                className="bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-lg"
+                onClick={() => navigate(`/embed/${v.id}`)}
+              >
+                <div className="w-full aspect-video bg-black pointer-events-none">
+                  {v.url?.includes("<iframe") ? (
+                    <iframe
+                      src={v.url.match(/src=["']([^"']+)["']/)?.[1]}
+                      title={v.description || "Video"}
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts allow-same-origin allow-presentation"
+                      scrolling="no"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video
+                      src={v.url}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </div>
+                <div className="p-1.5">
+                  <div className="text-pink-500 text-[10px] mb-1">
+                    Added:{" "}
+                    {v.added
+                      ? new Date(v.added).toLocaleDateString()
+                      : ""}{" "}
+                    | <b>{v.category}</b>
+                  </div>
+                  <div className="text-gray-300 text-xs line-clamp-2">
+                    {v.description}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       <Footer />
-
-      <style>{`
-        /* Loading Spinner */
-        .loading-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          background: #111;
-        }
-        .spinner {
-          width: 50px;
-          height: 50px;
-          border: 5px solid #444;
-          border-top-color: #e60073;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .embed-page-layout {
-          background: #111;
-          color: #fff;
-          min-height: 100vh;
-          padding-top: 150px;
-        }
-        .embed-page-main-content {
-          padding: 0;
-          margin: 0 auto;
-          max-width: 100%;
-          width: 100%;
-        }
-
-        /* Default single-column layout */
-        .main-video-column {
-          width: 100%;
-          max-width: none;
-          margin: 0;
-        }
-
-        .related-videos-sidebar {
-          margin-top: 32px;
-        }
-
-        .embed-player-wrapper {
-          width: 100%;
-          margin: 0;
-          aspect-ratio: 16 / 9;
-          background: #000;
-          border-radius: 0;
-          overflow: hidden;
-        }
-        .embed-iframe-container, .embed-video-container, .embed-iframe, .embed-video {
-          width: 100%; height: 100%; border: none;
-        }
-        .embed-error {
-          color: #e60073; font-size: 18px; display: flex;
-          justify-content: center; align-items: center; height: 100%;
-        }
-        
-        .video-title {
-            padding: 16px 0;
-        }
-
-        .video-title h2 {
-            margin: 0;
-            font-size: 1.5em;
-            color: #eee;
-            line-height: 1.4;
-            text-align: justify;
-        }
-
-        .video-actions-bar {
-            display: flex;
-            justify-content: flex-end; /* Align items to the right */
-            align-items: center;
-            background: #1a1a1a;
-            padding: 12px 20px;
-            border-radius: 8px;
-            margin-bottom: 24px;
-        }
-
-        .video-stats {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 1.1em;
-            color: #aaa;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-        .stat-item:hover {
-            color: #e60073;
-        }
-        .stat-item.like-button.liked {
-            color: #e60073;
-        }
-
-        .comment-section {
-            background: #1a1a1a;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 24px;
-        }
-        .comment-section h3 {
-            margin-top: 0;
-            color: #e60073;
-        }
-        .comment-form {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .comment-form input {
-            flex-grow: 1;
-            background: #222;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 10px;
-            color: #fff;
-            font-size: 1em;
-        }
-        .comment-form button {
-            background: #e60073;
-            color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .comment-list .comment-item {
-            border-bottom: 1px solid #333;
-            padding: 12px 0;
-        }
-        .comment-list .comment-item:last-child {
-            border-bottom: none;
-        }
-        .comment-author {
-            font-weight: bold;
-            color: #e60073;
-            margin: 0 0 4px 0;
-        }
-        .comment-text {
-            margin: 0;
-            color: #ddd;
-        }
-
-        .related-videos-section {
-            margin-top: 32px;
-        }
-        .related-videos-section h2 {
-          font-size: 24px; margin-bottom: 16px; color: #e60073;
-        }
-
-        /* Desktop-specific layout */
-        @media (min-width: 1200px) {
-          .embed-page-main-content {
-            display: flex;
-            flex-direction: row;
-            gap: 0;
-            max-width: 100%;
-            align-items: flex-start;
-            padding: 0 24px; /* Add horizontal padding */
-          }
-          .main-video-column {
-            flex: 3.5;
-            max-width: none;
-            margin: 0;
-            padding: 24px 0;
-          }
-          .related-videos-sidebar {
-            flex: 1;
-            margin: 0;
-            padding: 24px;
-            background: #0a0a0a;
-          }
-          .related-videos-sidebar .video-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-          }
-          .related-videos-sidebar .video-card {
-            display: flex;
-            flex-direction: row;
-            gap: 12px;
-            align-items: center;
-            background: #1a1a1a;
-            border-radius: 0;
-            padding: 12px 24px;
-          }
-          .related-videos-sidebar .video-meta {
-            display: none; /* Hide metadata in sidebar */
-          }
-          .related-videos-sidebar .video-thumbnail {
-            flex-shrink: 0;
-            width: 160px; /* Increased width */
-            height: 90px; /* Increased height */
-          }
-          .related-videos-sidebar .video-thumbnail img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 4px;
-          }
-          .related-videos-sidebar .video-info {
-            flex-grow: 1;
-          }
-          .related-videos-sidebar .video-description {
-            font-size: 0.9em;
-            line-height: 1.3;
-            color: #ddd;
-            margin: 0;
-          }
-          .related-videos-sidebar h2 {
-            font-size: 20px;
-            padding: 0 24px;
-            margin-bottom: 16px;
-          }
-        }
-        @media (max-width: 1199px) {
-          .related-videos-sidebar {
-            margin-top: 32px;
-          }
-        }
-        @media (max-width: 768px) {
-            .video-title h2 {
-                font-size: 1.3em;
-            }
-            .video-actions-bar {
-                justify-content: center;
-            }
-        }
-        @media (max-width: 600px) {
-          .embed-page-layout { padding-top: 120px; }
-          .embed-player-wrapper { border-radius: 0; }
-        }
-      `}</style>
     </div>
   );
 };

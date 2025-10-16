@@ -1,27 +1,32 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// ✅ Your Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyAfLY0MrsseTHJ7yZg8uxwUvRPXKehd73Y",
   authDomain: "xstream1-60177.firebaseapp.com",
   projectId: "xstream1-60177",
-  storageBucket: "xstream1-60177.firebasestorage.app",
+  storageBucket: "xstream1-60177.appspot.com", // still needed for Firestore’s internal use
   messagingSenderId: "672677425882",
   appId: "1:672677425882:web:c4aa610cf2b4b5e4c72be3",
-  measurementId: "G-BCBZQMP2FD"
+  measurementId: "G-BCBZQMP2FD",
 };
 
-// Initialize Firebase
+// ✅ Initialize Firebase app
 export const app = initializeApp(firebaseConfig);
-export const analytics = getAnalytics(app);
+
+// ✅ Analytics only if supported (avoids local/SSR error)
+export let analytics = null;
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  });
+}
+
+// ✅ Firebase services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
