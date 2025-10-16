@@ -4,6 +4,8 @@ import { getFirestore, collection, onSnapshot } from "firebase/firestore";
 import { app } from "../firebase";
 import Footer from "../components/Footer";
 import { TopNav } from "../components/TopNav";
+import Banner from "../components/Banner"; // ✅ Added Banner
+import NativeBannerModal from "../components/NativeBannerModal";
 
 const Dashboard = () => {
   const [showCategories, setShowCategories] = useState(false);
@@ -55,7 +57,8 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="bg-gray-900 min-h-screen pt-28 text-white">
+    <div className="relative min-h-screen text-white bg-gray-900">
+
       <TopNav 
         search={search}
         setSearch={setSearch}
@@ -67,19 +70,23 @@ const Dashboard = () => {
         selectedCategory={selectedCategory}
       />
 
-      <main className="max-w-[90rem] mx-auto px-4 py-6">
+      {/* Banner placed immediately below TopNav */}
+      <Banner />
+
+      <main className="max-w-[90rem] mx-auto px-4 pt-2 pb-6">
+
         {filteredVideos.length === 0 ? (
-          <div className="text-gray-400 text-center py-20">No videos found.</div>
+          <div className="py-20 text-center text-gray-400">No videos found.</div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {currentVideos.map(v => (
                 <div
                   key={v.id}
-                  className="bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-lg"
+                  className="overflow-hidden transition-transform bg-gray-800 rounded-lg shadow-lg cursor-pointer hover:scale-105"
                   onClick={() => navigate(`/embed/${v.id}`)}
                 >
-                  <div className="relative aspect-video bg-black pointer-events-none">
+                  <div className="relative bg-black pointer-events-none aspect-video">
                     <iframe
                       src={getEmbedSrc(v.url)}
                       title={v.description || "Video"}
@@ -88,13 +95,12 @@ const Dashboard = () => {
                       scrolling="no"
                       allowFullScreen
                     />
-                    
                   </div>
                   <div className="p-3">
-                    <div className="text-pink-500 text-xs mb-1">
+                    <div className="mb-1 text-xs text-pink-500">
                       Added: {v.added ? new Date(v.added).toLocaleString() : ""} | Category: <b>{v.category}</b>
                     </div>
-                    <div className="text-gray-300 text-sm line-clamp-2">{v.description}</div>
+                    <div className="text-sm text-gray-300 line-clamp-2">{v.description}</div>
                   </div>
                 </div>
               ))}
@@ -108,6 +114,9 @@ const Dashboard = () => {
       </main>
 
       <Footer />
+
+      {/* Native Banner Modal */}
+      <NativeBannerModal cooldown={120000} /> {/* 2-minute cooldown */}
     </div>
   );
 };
@@ -119,7 +128,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
       <ul className="flex space-x-2">
         {currentPage > 1 && (
           <li>
-            <button onClick={() => onPageChange(currentPage - 1)} className="px-3 py-1 border border-pink-600 rounded text-pink-600 hover:bg-pink-600 hover:text-white transition">Prev</button>
+            <button onClick={() => onPageChange(currentPage - 1)} className="px-3 py-1 text-pink-600 transition border border-pink-600 rounded hover:bg-pink-600 hover:text-white">Prev</button>
           </li>
         )}
         {pageNumbers.map(n => (
@@ -136,7 +145,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
         ))}
         {currentPage < totalPages && (
           <li>
-            <button onClick={() => onPageChange(currentPage + 1)} className="px-3 py-1 border border-pink-600 rounded text-pink-600 hover:bg-pink-600 hover:text-white transition">Next</button>
+            <button onClick={() => onPageChange(currentPage + 1)} className="px-3 py-1 text-pink-600 transition border border-pink-600 rounded hover:bg-pink-600 hover:text-white">Next</button>
           </li>
         )}
       </ul>

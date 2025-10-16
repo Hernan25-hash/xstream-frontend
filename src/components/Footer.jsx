@@ -4,15 +4,15 @@ import logo from '../assets/logo.png';
 
 const Footer = () => {
   return (
-    <footer className="bg-gray-900 text-gray-400 mt-12">
-      <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-center gap-6">
+    <footer className="mt-12 text-gray-400 bg-gray-900">
+      <div className="flex flex-col items-center justify-center gap-6 px-4 py-6 mx-auto max-w-7xl sm:flex-row">
         {/* Logo & About */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 text-center sm:text-center">
+        <div className="flex flex-col items-center justify-center gap-3 text-center sm:flex-row sm:gap-4 sm:text-center">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="XStream Secrets" className="h-10 w-auto" />
+            <img src={logo} alt="XStream Secrets" className="w-auto h-10" />
             
           </div>
-          <p className="text-gray-400 text-xs sm:text-sm max-w-xs sm:max-w-md">
+          <p className="max-w-xs text-xs text-gray-400 sm:text-sm sm:max-w-md">
             is a website that embeds videos from legitimate adult sites for 18+ audiences. 
             We provide a curated viewing experience while respecting content creators’ platforms.
           </p>
@@ -21,9 +21,10 @@ const Footer = () => {
        
       </div>
 
-      <div className="border-t border-gray-700 mt-4 text-center text-xs py-3">
-        &copy; {new Date().getFullYear()} XStream Secrets. All Rights Reserved. For adults (18+) only.
-      </div>
+      <div className="w-full px-4 py-3 mt-4 text-xs text-center border-t border-gray-700 sm:px-6">
+  &copy; {new Date().getFullYear()} XStream Secrets. All Rights Reserved. For adults (18+) only.
+</div>
+
     </footer>
   );
 };

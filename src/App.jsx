@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import AdminPanel from "./admin/AdminPanel";
 import Login from "./admin/Login";
 import EmbedPage from "./components/EmbedPage";
+import Sponsored from "./pages/Sponsored";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 // 🚦 Route guard for 18+ check
@@ -20,10 +21,23 @@ const RequireAwareness = ({ children }) => {
   const progress = localStorage.getItem("xstream-progress");
   const location = useLocation();
 
-  // If user hasn’t passed awareness, redirect them
   if (progress !== "dashboard") {
     return <Navigate to="/age-verification" state={{ from: location }} replace />;
   }
+  return children;
+};
+
+// 🚦 Route guard for Sponsored cooldown before EmbedPage
+const RequireSponsored = ({ children }) => {
+  const location = useLocation();
+  const lastSponsored = localStorage.getItem("xstream-sponsored-cooldown");
+  const now = Date.now();
+
+  // Cooldown is 2 minutes (120000 ms)
+  if (!lastSponsored || now - Number(lastSponsored) > 120000) {
+    return <Navigate to="/sponsored" state={{ from: location }} replace />;
+  }
+
   return children;
 };
 
@@ -36,7 +50,6 @@ function App() {
     setShowSplash(false);
     const progress = localStorage.getItem("xstream-progress");
 
-    // ✅ If first visit (no progress), always go to /age-verification
     if (!progress) {
       localStorage.setItem("xstream-progress", "awareness");
       navigate("/age-verification", { replace: true });
@@ -60,7 +73,7 @@ function App() {
   }, []);
 
   return (
-    <div className="bg-black text-white min-h-screen">
+    <div className="min-h-screen text-white bg-black">
       {showSplash ? (
         <SplashScreen onDone={handleSplashDone} />
       ) : (
@@ -99,12 +112,24 @@ function App() {
           {/* 🔐 Login */}
           <Route path="/login" element={<Login />} />
 
-          {/* 🎥 Embed */}
+          {/* 🎁 Sponsored Page */}
+          <Route
+            path="/sponsored"
+            element={
+              <RequireAwareness>
+                <Sponsored />
+              </RequireAwareness>
+            }
+          />
+
+          {/* 🎥 Embed Page with Sponsored cooldown */}
           <Route
             path="/embed/:id"
             element={
               <RequireAwareness>
-                <EmbedPage />
+                <RequireSponsored>
+                  <EmbedPage />
+                </RequireSponsored>
               </RequireAwareness>
             }
           />
