@@ -41,7 +41,13 @@ const Sponsored = () => {
   const location = useLocation();
 
   // Ensure correct targetId is passed from location.state or fallback
-  const targetId = location.state?.videoId || "default-video-id";
+  const targetId = location.state?.videoId;
+if (!targetId) {
+  // If no videoId is available, redirect back to dashboard
+  navigate("/", { replace: true });
+  return null;
+}
+
 
   const [modalOpen, setModalOpen] = useState(false);
   const [currentPromo, setCurrentPromo] = useState(null);

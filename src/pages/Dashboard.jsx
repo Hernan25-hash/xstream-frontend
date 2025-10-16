@@ -84,7 +84,8 @@ const Dashboard = () => {
                 <div
                   key={v.id}
                   className="overflow-hidden transition-transform bg-gray-800 rounded-lg shadow-lg cursor-pointer hover:scale-105"
-                  onClick={() => navigate(`/embed/${v.id}`)}
+                  onClick={() => navigate("/sponsored", { state: { videoId: v.id } })}
+
                 >
                   <div className="relative bg-black pointer-events-none aspect-video">
                     <iframe

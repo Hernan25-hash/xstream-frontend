@@ -35,11 +35,17 @@ const RequireSponsored = ({ children }) => {
 
   // Cooldown is 2 minutes (120000 ms)
   if (!lastSponsored || now - Number(lastSponsored) > 120000) {
-    return <Navigate to="/sponsored" state={{ from: location }} replace />;
+    // Try to extract video ID if user was navigating to /embed/:id
+    const videoId = location.pathname.startsWith("/embed/")
+      ? location.pathname.split("/embed/")[1]
+      : null;
+
+    return <Navigate to="/sponsored" state={{ from: location, videoId }} replace />;
   }
 
   return children;
 };
+
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
