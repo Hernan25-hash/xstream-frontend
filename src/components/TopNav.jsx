@@ -44,12 +44,30 @@ export const TopNav = ({
 
               {/* Categories Dropdown */}
               {showCategories && (
-                <div className="absolute top-full left-0 bg-gray-900 rounded-md shadow-lg mt-1 min-w-[150px] max-h-60 overflow-auto z-50">
+                <div className="absolute top-full left-0 bg-gray-900 rounded-md shadow-lg mt-1 min-w-[160px] max-h-60 overflow-auto z-50">
+                  
+                  {/* All Option */}
+                  <div
+                    onClick={() => { 
+                      setSelectedCategory(null); 
+                      setShowCategories(false); 
+                    }}
+                    className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${
+                      !selectedCategory ? "bg-pink-600" : ""
+                    }`}
+                  >
+                    All
+                  </div>
+
+                  {/* Dynamic Firestore Categories */}
                   {availableCategories.length > 0 ? (
                     availableCategories.map(cat => (
                       <div
                         key={cat}
-                        onClick={() => { setSelectedCategory(cat); setShowCategories(false); }}
+                        onClick={() => { 
+                          setSelectedCategory(cat); 
+                          setShowCategories(false); 
+                        }}
                         className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${
                           selectedCategory === cat ? "bg-pink-600" : ""
                         }`}
@@ -64,11 +82,11 @@ export const TopNav = ({
               )}
             </div>
 
-            {/* Search Box */}
+            {/* Smart Search Box */}
             <div className="w-full mt-1 sm:w-auto sm:mt-0">
               <input
                 type="text"
-                placeholder="Search by description..."
+                placeholder="Search by description or category..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="w-full px-2 py-1 text-sm text-white placeholder-gray-400 transition bg-gray-800 border border-pink-600 rounded-lg sm:w-56 focus:outline-none focus:ring-2 focus:ring-pink-600"

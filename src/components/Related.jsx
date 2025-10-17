@@ -1,5 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaEye } from "react-icons/fa";
+
+const formatViews = (num = 0) => {
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (num >= 1_000) return (num / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  return num.toString();
+};
 
 const Related = ({ relatedVideos }) => {
   const navigate = useNavigate();
@@ -8,39 +15,53 @@ const Related = ({ relatedVideos }) => {
   if (!relatedVideos || relatedVideos.length === 0)
     return <p className="text-gray-400">No related videos found.</p>;
 
-  const limit = 4; // Number of videos to show initially (mobile + desktop)
+  const limit = 4; // Number of videos to show initially
   const displayedVideos = showAll ? relatedVideos : relatedVideos.slice(0, limit);
 
   return (
     <div className="flex-shrink-0 w-full lg:w-1/4">
       <h3 className="mb-2 font-semibold text-pink-500 text-md">Related Videos</h3>
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
         {displayedVideos.map((v) => (
           <div
             key={v.id}
-            className="overflow-hidden transition-transform bg-gray-800 rounded-lg shadow-lg cursor-pointer hover:scale-105"
+            className="overflow-hidden transition-transform bg-gray-800 shadow-lg cursor-pointer hover:scale-105"
             onClick={() => navigate(`/embed/${v.id}`)}
           >
-            <div className="w-full bg-black pointer-events-none aspect-video">
-              {v.url?.includes("<iframe") ? (
-                <iframe
-                  src={v.url.match(/src=["']([^"']+)["']/)?.[1]}
-                  title={v.description || "Video"}
-                  className="w-full h-full border-0"
-                  sandbox="allow-scripts allow-same-origin allow-presentation"
-                  scrolling="no"
-                  allowFullScreen
+            {/* Thumbnail with duration overlay */}
+            <div className="relative">
+              {v.thumbnail ? (
+                <img
+                  src={v.thumbnail}
+                  alt={v.description || "Video Thumbnail"}
+                  className="object-cover w-full aspect-video"
                 />
               ) : (
-                <video src={v.url} className="object-cover w-full h-full" />
+                <div className="w-full bg-black aspect-video" />
+              )}
+
+              {/* Duration (bottom-left) */}
+              {v.duration && (
+                <div className="absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded">
+                  {v.duration}
+                </div>
               )}
             </div>
+
+            {/* Video Info */}
             <div className="p-1.5">
-              <div className="text-pink-500 text-[10px] mb-1">
-                Added: {v.added ? new Date(v.added).toLocaleDateString() : ""} |{" "}
-                <b>{v.category}</b>
+              
+
+              {/* Description */}
+              <div className="text-[10px] text-gray-300 line-clamp-2">{v.description}</div>
+
+              {/* Views */}
+              <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                <FaEye className="w-3 h-3" />
+                <span>{formatViews(v.views ?? 0)}</span>
+
               </div>
-              <div className="text-xs text-gray-300 line-clamp-2">{v.description}</div>
             </div>
           </div>
         ))}

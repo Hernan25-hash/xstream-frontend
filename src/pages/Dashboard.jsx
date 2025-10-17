@@ -6,6 +6,14 @@ import Footer from "../components/Footer";
 import { TopNav } from "../components/TopNav";
 import Banner from "../components/Banner"; // ✅ Added Banner
 import NativeBannerModal from "../components/NativeBannerModal";
+import SocialBar from "../components/SocialBar";
+
+const formatViews = (num = 0) => {
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (num >= 1_000) return (num / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  return num.toString();
+};
+
 
 const Dashboard = () => {
   const [showCategories, setShowCategories] = useState(false);
@@ -80,32 +88,68 @@ const Dashboard = () => {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {currentVideos.map(v => (
-                <div
-                  key={v.id}
-                  className="overflow-hidden transition-transform bg-gray-800 rounded-lg shadow-lg cursor-pointer hover:scale-105"
-                  onClick={() => navigate("/sponsored", { state: { videoId: v.id } })}
+  {currentVideos.map(v => (
+    <div
+  key={v.id}
+  className="overflow-hidden transition-transform bg-gray-800 shadow-lg cursor-pointer hover:scale-105"
+  onClick={() => navigate("/sponsored", { state: { videoId: v.id } })}
+>
+  {/* Thumbnail with Duration Overlay */}
+  <div className="relative">
+    {v.thumbnail ? (
+      <img
+        src={v.thumbnail}
+        alt={v.description || "Video Thumbnail"}
+        className="object-cover w-full aspect-video"
+      />
+    ) : (
+      <div className="w-full bg-black aspect-video" />
+    )}
 
-                >
-                  <div className="relative bg-black pointer-events-none aspect-video">
-                    <iframe
-                      src={getEmbedSrc(v.url)}
-                      title={v.description || "Video"}
-                      className="w-full h-full border-0"
-                      sandbox="allow-scripts allow-same-origin allow-presentation"
-                      scrolling="no"
-                      allowFullScreen
-                    />
-                  </div>
-                  <div className="p-3">
-                    <div className="mb-1 text-xs text-pink-500">
-                      Added: {v.added ? new Date(v.added).toLocaleString() : ""} | Category: <b>{v.category}</b>
-                    </div>
-                    <div className="text-sm text-gray-300 line-clamp-2">{v.description}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+    {/* Duration (bottom-left inside image) */}
+    {v.duration && (
+      <span className="absolute bottom-1 left-1 px-2 py-0.5 text-xs font-semibold text-white">
+         {v.duration}
+      </span>
+    )}
+  </div>
+
+  <div className="p-2">
+  <div className="text-[10px] text-gray-300 line-clamp-2">{v.description}</div>
+
+
+  {/* Views (compact layout) */}
+  <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-400">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-3 h-3"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+      />
+    </svg>
+    <span>{formatViews(v.views ?? 0)}</span>
+
+  </div>
+</div>
+
+</div>
+
+  ))}
+</div>
+
 
             {totalPages > 1 && (
               <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={paginate} />
@@ -118,6 +162,9 @@ const Dashboard = () => {
 
       {/* Native Banner Modal */}
       <NativeBannerModal cooldown={120000} /> {/* 2-minute cooldown */}
+      {/* Floating SocialBar */}
+<SocialBar />
+
     </div>
   );
 };

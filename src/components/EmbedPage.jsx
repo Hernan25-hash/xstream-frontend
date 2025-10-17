@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Helmet } from "react-helmet";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -16,27 +16,55 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { app } from "../firebase";
-import { FaEye, FaHeart, FaComment, FaShare, FaArrowLeft, FaClipboard } from "react-icons/fa";
+import {
+  FaEye,
+  FaHeart,
+  FaComment,
+  FaShare,
+  FaArrowLeft,
+  FaClipboard,
+} from "react-icons/fa";
 import Footer from "./Footer";
 import Banner from "./Banner";
 import Related from "./Related";
 
-// Persistent guest ID
+// ✅ Helper function for formatting numbers (K / M)
+const formatViews = (num = 0) => {
+  if (num >= 1_000_000)
+    return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (num >= 1_000)
+    return (num / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  return num.toString();
+};
+
+// ✅ Persistent guest ID
 const getGuestId = () => {
   let guestId = localStorage.getItem("xstreamGuestId");
   if (!guestId) {
-    guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    guestId = `guest_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     localStorage.setItem("xstreamGuestId", guestId);
   }
   return guestId;
 };
 
-// CommentSection
-const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubmit, db, videoId, guestId }) => {
+// ✅ CommentSection component
+const CommentSection = ({
+  comments,
+  newComment,
+  setNewComment,
+  handleCommentSubmit,
+  db,
+  videoId,
+  guestId,
+}) => {
   const [replyInputs, setReplyInputs] = useState({});
-  const formatGuestName = (id) => (id ? `Guest-${id.substring(6, 12)}` : "Guest");
+  const formatGuestName = (id) =>
+    id ? `Guest-${id.substring(6, 12)}` : "Guest";
 
-  const handleReplyChange = (commentId, text) => setReplyInputs((prev) => ({ ...prev, [commentId]: text }));
+  const handleReplyChange = (commentId, text) =>
+    setReplyInputs((prev) => ({ ...prev, [commentId]: text }));
 
   const handleReplySubmit = async (e, commentId) => {
     e.preventDefault();
@@ -55,8 +83,13 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
 
   return (
     <div className="mt-6">
-      <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
-      <form onSubmit={handleCommentSubmit} className="flex flex-col gap-2 mb-4 sm:flex-row">
+      <h3 className="mb-2 text-lg font-semibold">
+        Comments ({comments.length})
+      </h3>
+      <form
+        onSubmit={handleCommentSubmit}
+        className="flex flex-col gap-2 mb-4 sm:flex-row"
+      >
         <input
           type="text"
           value={newComment}
@@ -64,31 +97,46 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
           placeholder="Add a comment..."
           className="flex-1 p-2 text-white bg-gray-800 border border-gray-600 rounded"
         />
-        <button type="submit" className="px-4 py-2 text-white bg-pink-600 rounded">
+        <button
+          type="submit"
+          className="px-4 py-2 text-white bg-pink-600 rounded"
+        >
           Post
         </button>
       </form>
       <div className="space-y-3">
         {comments.map((comment) => (
           <div key={comment.id} className="p-3 bg-gray-900 rounded">
-            <p className="text-sm font-semibold text-pink-400">{formatGuestName(comment.author)}</p>
+            <p className="text-sm font-semibold text-pink-400">
+              {formatGuestName(comment.author)}
+            </p>
             <p className="text-sm text-white">{comment.text}</p>
             <div className="mt-2 ml-4 space-y-2">
               {comment.replies?.map((reply, idx) => (
                 <div key={idx} className="p-2 bg-gray-800 rounded">
-                  <p className="text-xs font-semibold text-pink-400">{formatGuestName(reply.author)}</p>
+                  <p className="text-xs font-semibold text-pink-400">
+                    {formatGuestName(reply.author)}
+                  </p>
                   <p className="text-xs text-white">{reply.text}</p>
                 </div>
               ))}
-              <form onSubmit={(e) => handleReplySubmit(e, comment.id)} className="flex gap-2 mt-1">
+              <form
+                onSubmit={(e) => handleReplySubmit(e, comment.id)}
+                className="flex gap-2 mt-1"
+              >
                 <input
                   type="text"
                   value={replyInputs[comment.id] || ""}
-                  onChange={(e) => handleReplyChange(comment.id, e.target.value)}
+                  onChange={(e) =>
+                    handleReplyChange(comment.id, e.target.value)
+                  }
                   placeholder="Reply..."
                   className="flex-1 p-1 text-xs text-white bg-gray-800 border border-gray-600 rounded"
                 />
-                <button type="submit" className="px-2 py-1 text-xs text-white bg-pink-600 rounded">
+                <button
+                  type="submit"
+                  className="px-2 py-1 text-xs text-white bg-pink-600 rounded"
+                >
                   Reply
                 </button>
               </form>
@@ -100,11 +148,12 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
   );
 };
 
-// Main Embed Page
+// ✅ Main Embed Page
 const EmbedPage = () => {
   const { id } = useParams();
   const db = getFirestore(app);
   const navigate = useNavigate();
+  const videoRef = useRef(null);
 
   const [video, setVideo] = useState(null);
   const [videos, setVideos] = useState([]);
@@ -115,9 +164,10 @@ const EmbedPage = () => {
   const [hasLiked, setHasLiked] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const shareRef = React.useRef(null);
+  const shareRef = useRef(null);
+  const [videoPaused, setVideoPaused] = useState(false);
 
-  // Smartlink cooldown
+  // ✅ Smartlink cooldown
   const [canTriggerSmartlink, setCanTriggerSmartlink] = useState(true);
   useEffect(() => {
     const lastTriggered = localStorage.getItem("smartlinkCooldown");
@@ -125,31 +175,34 @@ const EmbedPage = () => {
       const elapsed = Date.now() - Number(lastTriggered);
       if (elapsed < 120000) {
         setCanTriggerSmartlink(false);
-        const timer = setTimeout(() => setCanTriggerSmartlink(true), 120000 - elapsed);
+        const timer = setTimeout(
+          () => setCanTriggerSmartlink(true),
+          120000 - elapsed
+        );
         return () => clearTimeout(timer);
       }
     }
   }, []);
 
-  // Fetch video
+  // ✅ Fetch video
   useEffect(() => {
     if (!id) return;
-    const videoRef = doc(db, "videos", id);
+    const videoRefDoc = doc(db, "videos", id);
     const fetchVideo = async () => {
-      const snap = await getDoc(videoRef);
+      const snap = await getDoc(videoRefDoc);
       if (snap.exists()) {
         const videoData = snap.data();
         setVideo({ ...videoData, id: snap.id });
         setHasLiked(videoData.likedBy?.includes(guestId) || false);
-        await updateDoc(videoRef, { views: increment(1) });
+        await updateDoc(videoRefDoc, { views: increment(1) });
       } else setVideo(null);
     };
     fetchVideo();
     window.scrollTo(0, 0);
 
-    const unsubscribe = onSnapshot(videoRef, (doc) => {
-      if (doc.exists()) {
-        const videoData = doc.data();
+    const unsubscribe = onSnapshot(videoRefDoc, (docSnap) => {
+      if (docSnap.exists()) {
+        const videoData = docSnap.data();
         setVideo((prev) => ({ ...prev, ...videoData }));
         setHasLiked(videoData.likedBy?.includes(guestId) || false);
       }
@@ -157,7 +210,7 @@ const EmbedPage = () => {
     return () => unsubscribe();
   }, [id, db, guestId]);
 
-  // Fetch all videos
+  // ✅ Fetch all videos
   useEffect(() => {
     const q = collection(db, "videos");
     const unsubscribe = onSnapshot(q, (snap) => {
@@ -168,19 +221,24 @@ const EmbedPage = () => {
     return () => unsubscribe();
   }, [db]);
 
-  // Fetch comments
+  // ✅ Fetch comments
   useEffect(() => {
     if (!id) return;
-    const q = query(collection(db, "videos", id, "comments"), orderBy("createdAt", "desc"));
+    const q = query(
+      collection(db, "videos", id, "comments"),
+      orderBy("createdAt", "desc")
+    );
     const unsubscribe = onSnapshot(q, (snap) => {
       const commentsData = [];
-      snap.forEach((doc) => commentsData.push({ id: doc.id, replies: [], ...doc.data() }));
+      snap.forEach((doc) =>
+        commentsData.push({ id: doc.id, replies: [], ...doc.data() })
+      );
       setComments(commentsData);
     });
     return () => unsubscribe();
   }, [id, db]);
 
-  // Handle like
+  // ✅ Like handler
   const handleLike = async () => {
     if (!id || hasLiked) return;
     const ref = doc(db, "videos", id);
@@ -191,7 +249,7 @@ const EmbedPage = () => {
     setHasLiked(true);
   };
 
-  // Submit comment
+  // ✅ Comment submit
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!id || newComment.trim() === "") return;
@@ -204,21 +262,28 @@ const EmbedPage = () => {
     setNewComment("");
   };
 
-  // Handle outside click for share
+  // ✅ Outside click for share
   useEffect(() => {
     const handleOutsideClick = (e) => {
-      if (shareRef.current && !shareRef.current.contains(e.target)) setShareOpen(false);
+      if (shareRef.current && !shareRef.current.contains(e.target))
+        setShareOpen(false);
     };
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
-  // Related videos (case-insensitive & fallback)
+  // ✅ Related
   const relatedVideos = videos
-    .filter((v) => v.id !== id && v.category?.toLowerCase() === video?.category?.toLowerCase())
+    .filter(
+      (v) =>
+        v.id !== id &&
+        v.category?.toLowerCase() === video?.category?.toLowerCase()
+    )
     .slice(0, 8);
-
-  const fallbackVideos = relatedVideos.length > 0 ? relatedVideos : videos.filter((v) => v.id !== id).slice(0, 8);
+  const fallbackVideos =
+    relatedVideos.length > 0
+      ? relatedVideos
+      : videos.filter((v) => v.id !== id).slice(0, 8);
 
   if (!video)
     return (
@@ -227,32 +292,17 @@ const EmbedPage = () => {
       </div>
     );
 
-  const pageUrl = `https://xsecrets.xyz/embed/${video.id}`;
-
   return (
     <div className="relative min-h-screen text-white bg-black">
       <Helmet>
         <title>{video.description || "XStream Video"}</title>
-        <meta name="description" content={video.description || "Watch videos on XStream"} />
-        <meta property="og:type" content="video.other" />
-        <meta property="og:url" content={pageUrl} />
-        <meta property="og:title" content={video.description || "XStream"} />
-        <meta property="og:description" content={video.description || "Watch this video on XStream"} />
-        <meta property="og:image" content={video.thumbnail || "https://xsecrets.xyz/logo.png"} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:video" content={video.url} />
-        <meta property="og:video:type" content="video/mp4" />
-        <meta property="og:video-width" content="1280" />
-        <meta property="og:video-height" content="720" />
-        <meta name="twitter:card" content="player" />
-        <meta name="twitter:title" content={video.description || "XStream"} />
-        <meta name="twitter:description" content={video.description || "Watch videos on XStream"} />
-        <meta name="twitter:image" content={video.thumbnail || "https://xsecrets.xyz/logo.png"} />
-        <meta name="twitter:player" content={pageUrl} />
+        <meta
+          name="description"
+          content={video.description || "Watch videos on XStream"}
+        />
       </Helmet>
 
-      {/* Back button */}
+      {/* Back Button */}
       <button
         className="fixed z-50 p-2 text-white transition bg-gray-900 rounded-full shadow top-4 left-4 hover:bg-pink-600"
         onClick={() => navigate("/")}
@@ -260,63 +310,82 @@ const EmbedPage = () => {
         <FaArrowLeft />
       </button>
 
-      {/* Layout */}
       <div className="flex flex-col max-w-screen-xl gap-6 p-4 pt-12 mx-auto lg:flex-row lg:p-6 lg:pt-6">
-        {/* Main video + banner + stats + comments */}
         <div className="flex flex-col flex-1">
-         {/* Video container with Smartlink cooldown */}
-<div className="relative w-full mb-4 aspect-video">
-  {canTriggerSmartlink && (
-    <div
-      className="absolute inset-0 z-10 cursor-pointer"
-      onClick={() => {
-        window.open(
-          "https://www.effectivegatecpm.com/jyg7iqygdw?key=42a8d47d25b7b1c40d3fb95c274ab0ce",
-          "_blank"
-        );
-        setCanTriggerSmartlink(false);
-        localStorage.setItem("smartlinkCooldown", Date.now());
-      }}
-    />
-  )}
+          {/* ✅ Video Player */}
+          <div className="relative w-full mb-4 aspect-video">
+            {canTriggerSmartlink && (
+              <div
+                className="absolute inset-0 z-10 cursor-pointer"
+                onClick={() => {
+                  window.open(
+                    "https://www.effectivegatecpm.com/jyg7iqygdw?key=42a8d47d25b7b1c40d3fb95c274ab0ce",
+                    "_blank"
+                  );
+                  setCanTriggerSmartlink(false);
+                  localStorage.setItem("smartlinkCooldown", Date.now());
+                }}
+              />
+            )}
 
-  {video.url?.includes("<iframe") ? (
-    (() => {
-      const match = video.url.match(/src=["']([^"']+)["']/);
-      return match?.[1] ? (
-        <iframe
-          src={match[1]}
-          className="relative z-0 w-full h-full"
-          allow="autoplay; fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-presentation"
-          scrolling="no"
-          title="Embedded Video"
-        />
-      ) : (
-        <div className="text-sm text-center">Invalid iframe src.</div>
-      );
-    })()
-  ) : (
-    <video src={video.url} controls autoPlay className="relative z-0 w-full h-full" />
-  )}
-</div>
-
-
-          {/* Banner */}
-          <div className="w-full mb-2 sm:mb-4">
-            <Banner />
+            {video.url?.includes("<iframe") ? (
+              (() => {
+                const match = video.url.match(/src=["']([^"']+)["']/);
+                return match?.[1] ? (
+                  <iframe
+                    src={match[1]}
+                    className="relative z-0 w-full h-full"
+                    allow="autoplay; fullscreen"
+                    sandbox="allow-scripts allow-same-origin allow-presentation"
+                    scrolling="no"
+                    title="Embedded Video"
+                  />
+                ) : (
+                  <div className="text-sm text-center">Invalid iframe src.</div>
+                );
+              })()
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  src={video.url}
+                  controls
+                  autoPlay
+                  muted
+                  playsInline
+                  className="relative z-0 w-full h-full"
+                  onPause={() => setVideoPaused(true)}
+                  onPlay={() => setVideoPaused(false)}
+                />
+                {videoPaused && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70">
+                    <Banner key="paused-banner" />
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {/* Title */}
-          <h2 className="mb-1 text-xl font-semibold sm:mb-2">{video.description || "No Title"}</h2>
+          {/* ✅ Banner Below Video */}
+          <div className="w-full mb-2 sm:mb-4">
+            <Banner key="below-banner" />
+          </div>
 
-          {/* Stats & share */}
+          {/* ✅ Title */}
+          <h2 className="mb-1 text-xl font-semibold sm:mb-2">
+            {video.description || "No Title"}
+          </h2>
+
+          {/* ✅ Stats + Share */}
           <div className="flex flex-wrap items-center gap-4 mb-4 text-sm text-gray-400">
             <span className="flex items-center gap-1">
-              <FaEye /> {video.views || 0}
+              <FaEye />
+              <span>{formatViews(video.views ?? 0)}</span>
             </span>
             <span
-              className={`flex items-center gap-1 cursor-pointer ${hasLiked ? "text-red-500" : ""}`}
+              className={`flex items-center gap-1 cursor-pointer ${
+                hasLiked ? "text-red-500" : ""
+              }`}
               onClick={handleLike}
             >
               <FaHeart /> {video.hearts || 0}
@@ -327,6 +396,8 @@ const EmbedPage = () => {
             >
               <FaComment /> {comments.length}
             </span>
+
+            {/* ✅ Share Popup */}
             <span className="relative" ref={shareRef}>
               <button
                 className="flex items-center gap-1 px-2 py-1 transition bg-gray-800 rounded cursor-pointer hover:bg-gray-700"
@@ -336,10 +407,9 @@ const EmbedPage = () => {
               </button>
               {shareOpen && (
                 <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 sm:left-0 sm:translate-x-0 w-56 sm:w-64 max-w-[90vw] bg-gray-900 border border-gray-700 rounded shadow-lg p-4 z-50">
-                  <h3 className="mb-2 text-sm font-semibold text-pink-500">Share this video</h3>
-                  <p className="mb-2 text-xs text-gray-300">
-                    Copy the link below or share it on social media.
-                  </p>
+                  <h3 className="mb-2 text-sm font-semibold text-pink-500">
+                    Share this video
+                  </h3>
                   <input
                     type="text"
                     readOnly
@@ -356,12 +426,15 @@ const EmbedPage = () => {
                   >
                     <FaClipboard /> Copy Link
                   </button>
-                  {copySuccess && <p className="mt-1 text-xs text-green-400">Link copied!</p>}
+                  {copySuccess && (
+                    <p className="mt-1 text-xs text-green-400">Link copied!</p>
+                  )}
                 </div>
               )}
             </span>
           </div>
 
+          {/* ✅ Comments */}
           {showComments && (
             <CommentSection
               comments={comments}
@@ -375,7 +448,7 @@ const EmbedPage = () => {
           )}
         </div>
 
-        {/* Related videos */}
+        {/* ✅ Related */}
         <Related relatedVideos={fallbackVideos} />
       </div>
 

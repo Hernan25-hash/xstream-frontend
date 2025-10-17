@@ -16,42 +16,26 @@ import EmbedPage from "./components/EmbedPage";
 import Sponsored from "./pages/Sponsored";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
-// 🚦 Route guard for 18+ check
+// 🚦 Route guard for 18+ check + deep link awareness
 const RequireAwareness = ({ children }) => {
   const progress = localStorage.getItem("xstream-progress");
   const location = useLocation();
 
+  // If user has not passed the age verification
   if (progress !== "dashboard") {
+    // Save intended route before redirecting
+    localStorage.setItem("xstream-intended-path", location.pathname);
     return <Navigate to="/age-verification" state={{ from: location }} replace />;
   }
-  return children;
-};
-
-// 🚦 Route guard for Sponsored cooldown before EmbedPage
-const RequireSponsored = ({ children }) => {
-  const location = useLocation();
-  const lastSponsored = localStorage.getItem("xstream-sponsored-cooldown");
-  const now = Date.now();
-
-  // Cooldown is 2 minutes (120000 ms)
-  if (!lastSponsored || now - Number(lastSponsored) > 120000) {
-    // Try to extract video ID if user was navigating to /embed/:id
-    const videoId = location.pathname.startsWith("/embed/")
-      ? location.pathname.split("/embed/")[1]
-      : null;
-
-    return <Navigate to="/sponsored" state={{ from: location, videoId }} replace />;
-  }
 
   return children;
 };
-
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const navigate = useNavigate();
 
-  // Splash complete handler
+  // ✅ Splash complete handler
   const handleSplashDone = () => {
     setShowSplash(false);
     const progress = localStorage.getItem("xstream-progress");
@@ -62,17 +46,25 @@ function App() {
     }
   };
 
-  // Awareness handlers
+  // ✅ Awareness handlers
   const handleAwarenessEnter = () => {
     localStorage.setItem("xstream-progress", "dashboard");
-    navigate("/", { replace: true });
+
+    // If user had a saved target (like /embed/:id), go there
+    const intendedPath = localStorage.getItem("xstream-intended-path");
+    if (intendedPath) {
+      navigate(intendedPath, { replace: true });
+      localStorage.removeItem("xstream-intended-path");
+    } else {
+      navigate("/", { replace: true });
+    }
   };
 
   const handleAwarenessExit = () => {
     window.location.href = "https://www.google.com";
   };
 
-  // Auto remove splash after 2.5s
+  // ✅ Auto remove splash after 2.5s
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(timer);
@@ -128,14 +120,12 @@ function App() {
             }
           />
 
-          {/* 🎥 Embed Page with Sponsored cooldown */}
+          {/* 🎥 Embed Page (deep link support) */}
           <Route
             path="/embed/:id"
             element={
               <RequireAwareness>
-                <RequireSponsored>
-                  <EmbedPage />
-                </RequireSponsored>
+                <EmbedPage />
               </RequireAwareness>
             }
           />
