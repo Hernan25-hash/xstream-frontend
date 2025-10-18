@@ -1,18 +1,49 @@
 import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import logoImage from '../assets/logo.png';
 
-const navLinks = ["HOME", "CATEGORIES"];
+const navLinks = ["HOME", "CATEGORIES", "TOP RATED", "MOST VIEWED"];
 
 export const TopNav = ({ 
   search, 
   setSearch, 
-  handleNavClick, 
   showCategories, 
   availableCategories, 
   setSelectedCategory, 
   setShowCategories,
   selectedCategory
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation(); // ✅ For detecting current route
+
+  const handleNavClick = (link) => {
+    switch (link) {
+      case "HOME":
+        setSelectedCategory(null);
+        setSearch("");
+        navigate("/");
+        break;
+      case "CATEGORIES":
+        setShowCategories(v => !v);
+        break;
+      case "TOP RATED":
+        navigate("/toprated");
+        break;
+      case "MOST VIEWED":
+        navigate("/mostviewed");
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Map link text to routes for highlighting
+  const linkToRoute = {
+    "HOME": "/",
+    "TOP RATED": "/toprated",
+    "MOST VIEWED": "/mostviewed",
+  };
+
   return (
     <>
       <div className="fixed top-0 left-0 z-50 w-full px-3 py-2 bg-black shadow-md sm:py-3">
@@ -32,15 +63,19 @@ export const TopNav = ({
 
             {/* Nav Links */}
             <div className="relative flex gap-3">
-              {navLinks.map(link => (
-                <button
-                  key={link}
-                  onClick={() => handleNavClick(link)}
-                  className="text-sm font-semibold text-gray-200 transition-colors hover:text-pink-600 sm:text-base"
-                >
-                  {link}
-                </button>
-              ))}
+              {navLinks.map(link => {
+                const isActive = linkToRoute[link] === location.pathname;
+                return (
+                  <button
+                    key={link}
+                    onClick={() => handleNavClick(link)}
+                    className={`text-sm font-semibold sm:text-base transition-colors
+                      ${isActive ? "text-pink-600 underline underline-offset-4" : "text-gray-200 hover:text-pink-600"}`}
+                  >
+                    {link}
+                  </button>
+                );
+              })}
 
               {/* Categories Dropdown */}
               {showCategories && (
@@ -52,9 +87,7 @@ export const TopNav = ({
                       setSelectedCategory(null); 
                       setShowCategories(false); 
                     }}
-                    className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${
-                      !selectedCategory ? "bg-pink-600" : ""
-                    }`}
+                    className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${!selectedCategory ? "bg-pink-600" : ""}`}
                   >
                     All
                   </div>
@@ -68,9 +101,7 @@ export const TopNav = ({
                           setSelectedCategory(cat); 
                           setShowCategories(false); 
                         }}
-                        className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${
-                          selectedCategory === cat ? "bg-pink-600" : ""
-                        }`}
+                        className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${selectedCategory === cat ? "bg-pink-600" : ""}`}
                       >
                         {cat}
                       </div>

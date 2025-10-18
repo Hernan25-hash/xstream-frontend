@@ -14,16 +14,16 @@ import AdminPanel from "./admin/AdminPanel";
 import Login from "./admin/Login";
 import EmbedPage from "./components/EmbedPage";
 import Sponsored from "./pages/Sponsored";
+import TopRated from "./components/TopRated"; // ✅ Imported TopRated
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import MostViewed from "./components/MostViewed";
 
 // 🚦 Route guard for 18+ check + deep link awareness
 const RequireAwareness = ({ children }) => {
   const progress = localStorage.getItem("xstream-progress");
   const location = useLocation();
 
-  // If user has not passed the age verification
   if (progress !== "dashboard") {
-    // Save intended route before redirecting
     localStorage.setItem("xstream-intended-path", location.pathname);
     return <Navigate to="/age-verification" state={{ from: location }} replace />;
   }
@@ -49,8 +49,6 @@ function App() {
   // ✅ Awareness handlers
   const handleAwarenessEnter = () => {
     localStorage.setItem("xstream-progress", "dashboard");
-
-    // If user had a saved target (like /embed/:id), go there
     const intendedPath = localStorage.getItem("xstream-intended-path");
     if (intendedPath) {
       navigate(intendedPath, { replace: true });
@@ -97,6 +95,25 @@ function App() {
             }
           />
 
+          {/* 🔝 Top Rated */}
+          <Route
+            path="/toprated"
+            element={
+              <RequireAwareness>
+                <TopRated />
+              </RequireAwareness>
+            }
+          />
+          <Route
+  path="/mostviewed"
+  element={
+    <RequireAwareness>
+      <MostViewed />
+    </RequireAwareness>
+  }
+/>
+
+
           {/* 🔑 Admin Protected Route */}
           <Route
             path="/admin"
@@ -120,7 +137,7 @@ function App() {
             }
           />
 
-          {/* 🎥 Embed Page (deep link support) */}
+          {/* 🎥 Embed Page */}
           <Route
             path="/embed/:id"
             element={

@@ -25,15 +25,13 @@ import {
   FaClipboard,
 } from "react-icons/fa";
 import Footer from "./Footer";
-import Banner from "./Banner";
 import Related from "./Related";
 
 // ✅ Helper function for formatting numbers (K / M)
 const formatViews = (num = 0) => {
   if (num >= 1_000_000)
     return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
-  if (num >= 1_000)
-    return (num / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  if (num >= 1_000) return (num / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
   return num.toString();
 };
 
@@ -144,6 +142,29 @@ const CommentSection = ({
           </div>
         ))}
       </div>
+    </div>
+  );
+};
+
+// ✅ VideoTitle component with See More / See Less
+const VideoTitle = ({ text }) => {
+  const [expanded, setExpanded] = useState(false);
+  const maxChars = 120; // Approximate limit before "See more"
+
+  const needsToggle = text.length > maxChars;
+  const displayText = expanded || !needsToggle ? text : text.slice(0, maxChars) + "...";
+
+  return (
+    <div className="mt-2 mb-2 text-lg font-medium text-justify text-white sm:text-xl">
+      <p>{displayText}</p>
+      {needsToggle && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-1 text-xs font-semibold text-pink-500 hover:underline"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      )}
     </div>
   );
 };
@@ -269,7 +290,8 @@ const EmbedPage = () => {
         setShareOpen(false);
     };
     document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+    return () =>
+      document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
   // ✅ Related
@@ -304,7 +326,7 @@ const EmbedPage = () => {
 
       {/* Back Button */}
       <button
-        className="fixed z-50 p-2 text-white transition bg-gray-900 rounded-full shadow top-4 left-4 hover:bg-pink-600"
+        className="fixed z-50 p-2 text-white transition top-4 left-4 hover:bg-pink-600"
         onClick={() => navigate("/")}
       >
         <FaArrowLeft />
@@ -313,7 +335,7 @@ const EmbedPage = () => {
       <div className="flex flex-col max-w-screen-xl gap-6 p-4 pt-12 mx-auto lg:flex-row lg:p-6 lg:pt-6">
         <div className="flex flex-col flex-1">
           {/* ✅ Video Player */}
-          <div className="relative w-full mb-4 aspect-video">
+          <div className="relative w-full">
             {canTriggerSmartlink && (
               <div
                 className="absolute inset-0 z-10 cursor-pointer"
@@ -334,64 +356,52 @@ const EmbedPage = () => {
                 return match?.[1] ? (
                   <iframe
                     src={match[1]}
-                    className="relative z-0 w-full h-full"
+                    className="relative z-0 w-full h-[200px] sm:h-[360px] md:h-[480px] lg:h-[540px] shadow-lg"
                     allow="autoplay; fullscreen"
                     sandbox="allow-scripts allow-same-origin allow-presentation"
                     scrolling="no"
                     title="Embedded Video"
                   />
                 ) : (
-                  <div className="text-sm text-center">Invalid iframe src.</div>
+                  <div className="text-sm text-center text-gray-400">
+                    Invalid iframe src.
+                  </div>
                 );
               })()
             ) : (
-              <>
-                <video
-                  ref={videoRef}
-                  src={video.url}
-                  controls
-                  autoPlay
-                  muted
-                  playsInline
-                  className="relative z-0 w-full h-full"
-                  onPause={() => setVideoPaused(true)}
-                  onPlay={() => setVideoPaused(false)}
-                />
-                {videoPaused && (
-                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70">
-                    <Banner key="paused-banner" />
-                  </div>
-                )}
-              </>
+              <video
+                ref={videoRef}
+                src={video.url}
+                controls
+                autoPlay
+                muted
+                playsInline
+                className="relative z-0 w-full h-[200px] sm:h-[360px] md:h-[480px] lg:h-[540px] rounded-lg shadow-lg"
+                onPause={() => setVideoPaused(true)}
+                onPlay={() => setVideoPaused(false)}
+              />
             )}
           </div>
 
-          {/* ✅ Banner Below Video */}
-          <div className="w-full mb-2 sm:mb-4">
-            <Banner key="below-banner" />
-          </div>
-
           {/* ✅ Title */}
-          <h2 className="mb-1 text-xl font-semibold sm:mb-2">
-            {video.description || "No Title"}
-          </h2>
+          <VideoTitle text={video.description || "No Title"} />
 
           {/* ✅ Stats + Share */}
-          <div className="flex flex-wrap items-center gap-4 mb-4 text-sm text-gray-400">
+          <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-gray-400">
             <span className="flex items-center gap-1">
               <FaEye />
               <span>{formatViews(video.views ?? 0)}</span>
             </span>
             <span
               className={`flex items-center gap-1 cursor-pointer ${
-                hasLiked ? "text-red-500" : ""
+                hasLiked ? "text-red-500" : "hover:text-red-400 transition-colors"
               }`}
               onClick={handleLike}
             >
               <FaHeart /> {video.hearts || 0}
             </span>
             <span
-              className="flex items-center gap-1 cursor-pointer"
+              className="flex items-center gap-1 transition-colors cursor-pointer hover:text-pink-400"
               onClick={() => setShowComments(!showComments)}
             >
               <FaComment /> {comments.length}
@@ -400,13 +410,13 @@ const EmbedPage = () => {
             {/* ✅ Share Popup */}
             <span className="relative" ref={shareRef}>
               <button
-                className="flex items-center gap-1 px-2 py-1 transition bg-gray-800 rounded cursor-pointer hover:bg-gray-700"
+                className="flex items-center gap-1 px-3 py-1 transition bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700"
                 onClick={() => setShareOpen((prev) => !prev)}
               >
                 <FaShare /> Share
               </button>
               {shareOpen && (
-                <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 sm:left-0 sm:translate-x-0 w-56 sm:w-64 max-w-[90vw] bg-gray-900 border border-gray-700 rounded shadow-lg p-4 z-50">
+                <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 sm:left-0 sm:translate-x-0 w-56 sm:w-64 max-w-[90vw] bg-gray-900 border border-gray-700 rounded-lg shadow-lg p-4 z-50">
                   <h3 className="mb-2 text-sm font-semibold text-pink-500">
                     Share this video
                   </h3>
@@ -417,7 +427,7 @@ const EmbedPage = () => {
                     className="w-full p-2 mb-2 text-xs text-white bg-gray-800 border border-gray-600 rounded"
                   />
                   <button
-                    className="flex items-center justify-center w-full gap-2 px-3 py-2 text-xs text-white bg-pink-600 rounded"
+                    className="flex items-center justify-center w-full gap-2 px-3 py-2 text-xs text-white transition-colors bg-pink-600 rounded hover:bg-pink-500"
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.href);
                       setCopySuccess(true);
@@ -449,7 +459,7 @@ const EmbedPage = () => {
         </div>
 
         {/* ✅ Related */}
-        <Related relatedVideos={fallbackVideos} />
+        <Related relatedVideos={fallbackVideos} className="mt-6 lg:mt-0" />
       </div>
 
       <Footer />

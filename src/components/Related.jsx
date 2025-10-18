@@ -70,7 +70,7 @@ const Related = ({ relatedVideos }) => {
       {/* Show More Button */}
       {relatedVideos.length > limit && !showAll && (
         <button
-          className="w-full px-3 py-2 mt-2 text-xs font-semibold text-white bg-pink-600 rounded hover:bg-pink-500"
+          className="w-full px-3 py-2 mt-2 text-xs font-semibold text-pink-500 "
           onClick={() => setShowAll(true)}
         >
           See More
