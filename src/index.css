@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ✅ Optional global styling */
+html,
+body {
+  @apply bg-black text-white antialiased;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+/* Optional: smooth scroll + hide scrollbars if needed */
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Optional: reusable utility classes */
+.container-center {
+  @apply flex items-center justify-center;
+}
+
+.btn-primary {
+  @apply bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg px-6 py-3 transition-all duration-200;
+}
