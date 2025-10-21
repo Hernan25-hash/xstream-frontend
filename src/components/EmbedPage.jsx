@@ -16,6 +16,7 @@ import {
   Timestamp,
   query,
   orderBy,
+  deleteDoc,
 } from "firebase/firestore";
 import { app } from "../firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -28,10 +29,7 @@ import Banner from "../components/Banner";
 import Loading from "../components/Loading";
 import SearchResultsModal from "../components/SearchResultsModal";
 
-
-
-
-// Helper functions
+// ---------------- Helper Functions ----------------
 const formatViews = (num = 0) => {
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
   if (num >= 1_000) return (num / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
@@ -47,8 +45,16 @@ const getGuestId = () => {
   return guestId;
 };
 
-// CommentSection
-const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubmit, db, videoId, guestId }) => {
+// Helper to get display name for comments/replies
+const getAuthorName = (user) => {
+  if (!user) return "Guest";
+  return user.provider === "google"
+    ? user.username || user.displayName || "Guest"
+    : user.username || "User";
+};
+
+// ---------------- CommentSection ----------------
+const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubmit, db, videoId, guestId, currentUser }) => {
   const [replyInputs, setReplyInputs] = useState({});
   const formatGuestName = (id) => (id ? `Guest-${id.substring(6, 12)}` : "Guest");
 
@@ -58,82 +64,146 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
     e.preventDefault();
     const replyText = replyInputs[commentId];
     if (!replyText?.trim()) return;
+
     const commentRef = doc(db, "videos", videoId, "comments", commentId);
     await updateDoc(commentRef, {
       replies: arrayUnion({
         text: replyText,
-        author: guestId,
+        author: currentUser?.id || guestId,
+        authorName: getAuthorName(currentUser),
         createdAt: Timestamp.now(),
       }),
     });
     setReplyInputs((prev) => ({ ...prev, [commentId]: "" }));
   };
 
+  const handleDeleteComment = async (commentId, authorId) => {
+    const isOwner = (currentUser && authorId === currentUser.id) || (!currentUser && authorId === guestId);
+    if (!isOwner) return alert("You can only delete your own comment.");
+    if (window.confirm("Are you sure you want to delete this comment?")) {
+      await deleteDoc(doc(db, "videos", videoId, "comments", commentId));
+    }
+  };
+
+  const handleDeleteReply = async (commentId, replyIdx, replyAuthorId) => {
+    const isOwner = (currentUser && replyAuthorId === currentUser.id) || (!currentUser && replyAuthorId === guestId);
+    if (!isOwner) return alert("You can only delete your own reply.");
+    if (!window.confirm("Are you sure you want to delete this reply?")) return;
+
+    const commentRef = doc(db, "videos", videoId, "comments", commentId);
+    const commentSnap = await getDoc(commentRef);
+    if (!commentSnap.exists()) return;
+
+    const commentData = commentSnap.data();
+    const updatedReplies = [...commentData.replies];
+    updatedReplies.splice(replyIdx, 1);
+
+    await updateDoc(commentRef, { replies: updatedReplies });
+  };
+
   return (
     <div className="mt-6">
-      <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
-      <form
-  onSubmit={handleCommentSubmit}
-  className="flex items-start gap-2 mb-4"
->
-  {/* Avatar */}
-  <img
-    src="/avatar/profile.png"
-    alt="User Avatar"
-    className="flex-shrink-0 w-8 h-8 rounded-full"
-  />
-  
-  {/* Input + Button */}
-  <div className="flex flex-1 gap-2">
-    <input
-      type="text"
-      value={newComment}
-      onChange={(e) => setNewComment(e.target.value)}
-      placeholder="Add a comment..."
-      className="flex-1 p-2 text-white bg-gray-800 border border-gray-600 rounded"
-    />
-    <button
-      type="submit"
-      className="px-4 py-2 text-white bg-pink-600 rounded"
-    >
-      Post
-    </button>
-  </div>
-</form>
+  <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
 
-      <div className="space-y-3">
-        {comments.map((comment) => (
-          <div key={comment.id} className="p-3 bg-gray-900 rounded">
-            <p className="text-sm font-semibold text-pink-400">{formatGuestName(comment.author)}</p>
-            <p className="text-sm text-white">{comment.text}</p>
-            <div className="mt-2 ml-4 space-y-2">
-              {comment.replies?.map((reply, idx) => (
-                <div key={idx} className="p-2 bg-gray-800 rounded">
-                  <p className="text-xs font-semibold text-pink-400">{formatGuestName(reply.author)}</p>
-                  <p className="text-xs text-white">{reply.text}</p>
-                </div>
-              ))}
-              <form onSubmit={(e) => handleReplySubmit(e, comment.id)} className="flex gap-2 mt-1">
-                <input
-                  type="text"
-                  value={replyInputs[comment.id] || ""}
-                  onChange={(e) => handleReplyChange(comment.id, e.target.value)}
-                  placeholder="Reply..."
-                  className="flex-1 p-1 text-xs text-white bg-gray-800 border border-gray-600 rounded"
-                />
-                <button type="submit" className="px-2 py-1 text-xs text-white bg-pink-600 rounded">
-                  Reply
-                </button>
-              </form>
-            </div>
-          </div>
-        ))}
-      </div>
+  {/* New Comment Input */}
+  <form onSubmit={handleCommentSubmit} className="flex items-start gap-2 mb-4">
+    {/* Avatar */}
+    <div className="flex flex-col items-center">
+      <img
+        src="/avatar/profile.png"  // default avatar
+        alt="User Avatar"
+        className="flex-shrink-0 w-8 h-8 rounded-full"
+      />
+      <span className="mt-1 text-xs font-semibold text-center text-pink-400">
+        {currentUser?.displayName || currentUser?.username || "User"}
+      </span>
     </div>
+
+    {/* Input + Button */}
+    <div className="flex flex-1 gap-2">
+      <input
+        type="text"
+        value={newComment}
+        onChange={(e) => setNewComment(e.target.value)}
+        placeholder="Add a comment..."
+        className="flex-1 p-2 text-white bg-gray-800 border border-gray-600 rounded"
+      />
+      <button type="submit" className="px-4 py-2 text-white bg-pink-600 rounded">
+        Post
+      </button>
+    </div>
+  </form>
+
+  {/* Comments List */}
+  <div className="space-y-3">
+    {comments.map((comment) => (
+      <div key={comment.id} className="p-3 bg-gray-900 rounded">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* Default avatar for each comment */}
+            <img
+              src="/avatar/profile.png"
+              alt="User Avatar"
+              className="w-6 h-6 rounded-full"
+            />
+            <p className="text-sm font-semibold text-pink-400">
+              {comment.authorName || formatGuestName(comment.author)}
+            </p>
+          </div>
+
+          {(currentUser?.id === comment.author || guestId === comment.author) && (
+            <button
+              onClick={() => handleDeleteComment(comment.id, comment.author)}
+              className="text-xs text-gray-400 transition hover:text-red-500"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+
+        <p className="mt-1 text-sm text-white">{comment.text}</p>
+
+        {/* Replies */}
+        <div className="mt-2 ml-4 space-y-2">
+          {comment.replies?.map((reply, idx) => (
+            <div key={idx} className="p-2 bg-gray-800 rounded">
+              <div className="flex items-center gap-2">
+                <img
+                  src="/avatar/profile.png"
+                  alt="User Avatar"
+                  className="w-5 h-5 rounded-full"
+                />
+                <p className="text-xs font-semibold text-pink-400">
+                  {reply.authorName || formatGuestName(reply.author)}
+                </p>
+              </div>
+              <p className="text-xs text-white">{reply.text}</p>
+            </div>
+          ))}
+
+          {/* Reply Form */}
+          <form onSubmit={(e) => handleReplySubmit(e, comment.id)} className="flex gap-2 mt-1">
+            <input
+              type="text"
+              value={replyInputs[comment.id] || ""}
+              onChange={(e) => handleReplyChange(comment.id, e.target.value)}
+              placeholder="Reply..."
+              className="flex-1 p-1 text-xs text-white bg-gray-800 border border-gray-600 rounded"
+            />
+            <button type="submit" className="px-2 py-1 text-xs text-white bg-pink-600 rounded">
+              Reply
+            </button>
+          </form>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
   );
 };
 
-// VideoTitle
+// ---------------- VideoTitle ----------------
 const VideoTitle = ({ text }) => {
   const [expanded, setExpanded] = useState(false);
   const maxChars = 120;
@@ -152,7 +222,7 @@ const VideoTitle = ({ text }) => {
   );
 };
 
-// Main EmbedPage
+// ---------------- Main EmbedPage ----------------
 const EmbedPage = ({ user }) => {
   const { id } = useParams();
   const db = getFirestore(app);
@@ -175,60 +245,53 @@ const EmbedPage = ({ user }) => {
   const [favSuccess, setFavSuccess] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
 
-  
+  // TopNav search state
+  const [search, setSearch] = useState("");
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState(null);
 
- 
-
- // TopNav search state
-const [search, setSearch] = useState("");
-const [showSearchModal, setShowSearchModal] = useState(false);
-const [selectedVideo, setSelectedVideo] = useState(null); // must be BEFORE the useEffect
-
-// Navigate after modal closes
-useEffect(() => {
-  if (!showSearchModal && selectedVideo) {
-    navigate(`/embed/${selectedVideo}`);
-    setSelectedVideo(null); // reset
-  }
-}, [showSearchModal, selectedVideo, navigate]);
-
+  // Navigate after modal closes
+  useEffect(() => {
+    if (!showSearchModal && selectedVideo) {
+      navigate(`/embed/${selectedVideo}`);
+      setSelectedVideo(null);
+    }
+  }, [showSearchModal, selectedVideo, navigate]);
 
   // Authenticated user
   const [currentUser, setCurrentUser] = useState(user || null);
   const auth = getAuth();
- // check if video is favorited
-  useEffect(() => {
-  if (currentUser) {
-    const favRef = doc(db, "users", currentUser.id, "favorites", id);
-    getDoc(favRef).then((snap) => {
-      if (snap.exists()) setIsFavorited(true);
-    });
-  }
-}, [currentUser, db, id]);
 
+  // Check if video is favorited
+  useEffect(() => {
+    if (currentUser) {
+      const favRef = doc(db, "users", currentUser.id, "favorites", id);
+      getDoc(favRef).then((snap) => {
+        if (snap.exists()) setIsFavorited(true);
+      });
+    }
+  }, [currentUser, db, id]);
+
+  // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        const db = getFirestore(app);
         const userRef = doc(db, "users", u.uid);
         const userSnap = await getDoc(userRef);
 
         let avatarUrl = "/avatar/profile.png";
-        if (userSnap.exists() && userSnap.data().avatar) {
-          avatarUrl = userSnap.data().avatar;
-        } else if (u.photoURL) {
-          avatarUrl = u.photoURL;
-        }
+        if (userSnap.exists() && userSnap.data().avatar) avatarUrl = userSnap.data().avatar;
+        else if (u.photoURL) avatarUrl = u.photoURL;
 
         setCurrentUser({
           id: u.uid,
           avatar: avatarUrl,
           email: u.email,
-          displayName: u.displayName || userSnap.data()?.displayName || "Guest",
+          displayName: userSnap.data()?.displayName || u.displayName || "Guest",
+          username: userSnap.data()?.username || "",
+          provider: u.providerData[0]?.providerId === "google.com" ? "google" : "email",
         });
-      } else {
-        setCurrentUser(user || null);
-      }
+      } else setCurrentUser(user || null);
     });
     return () => unsubscribe();
   }, [auth, user]);
@@ -300,6 +363,7 @@ useEffect(() => {
     await addDoc(collection(db, "videos", id, "comments"), {
       text: newComment,
       author: currentUser?.id || guestId,
+      authorName: getAuthorName(currentUser),
       createdAt: Timestamp.now(),
       replies: [],
     });
@@ -329,27 +393,26 @@ useEffect(() => {
         <meta name="description" content={video.description || "Watch videos on XStream"} />
       </Helmet>
 
-     
-<TopNav
-  user={currentUser}
-  search={search}
-  setSearch={(val) => {
-    setSearch(val);
-    setShowSearchModal(val.trim().length > 0);
-  }}
-/>
+      {/* TopNav */}
+      <TopNav
+        user={currentUser}
+        search={search}
+        setSearch={(val) => {
+          setSearch(val);
+          setShowSearchModal(val.trim().length > 0);
+        }}
+      />
 
-{showSearchModal && (
-  <SearchResultsModal
-    searchTerm={search}
-    onClose={() => setShowSearchModal(false)}
-    onSelect={(videoId) => {
-      setSelectedVideo(videoId); // store clicked video
-      setShowSearchModal(false); // close modal first
-    }}
-  />
-)}
-
+      {showSearchModal && (
+        <SearchResultsModal
+          searchTerm={search}
+          onClose={() => setShowSearchModal(false)}
+          onSelect={(videoId) => {
+            setSelectedVideo(videoId);
+            setShowSearchModal(false);
+          }}
+        />
+      )}
 
       {/* Banner */}
       <Banner />
@@ -387,13 +450,13 @@ useEffect(() => {
 
           <VideoTitle text={video.description || "No Title"} />
 
-          {/* Stats + Share */}
+          {/* Stats + Share + Favorites */}
           <div className="flex flex-wrap items-center gap-4 mb-6 text-sm text-gray-400">
             <span className="flex items-center gap-1">
               <FaEye /> <span>{formatViews(video.views ?? 0)}</span>
             </span>
 
-            {/* Like / Heart */}
+            {/* Like */}
             <span
               className={`flex items-center gap-1 cursor-pointer ${hasLiked ? "text-red-500" : "hover:text-red-400 transition-colors"}`}
               onClick={() => {
@@ -408,7 +471,7 @@ useEffect(() => {
               <FaHeart /> {video.hearts || 0}
             </span>
 
-            {/* Comment */}
+            {/* Comments */}
             <span
               className="flex items-center gap-1 transition-colors cursor-pointer hover:text-pink-400"
               onClick={() => {
@@ -461,42 +524,36 @@ useEffect(() => {
                 </div>
               )}
             </span>
-            {/* Add to Favorites button */}
-<span
-  className={`flex items-center gap-1 cursor-pointer transition-colors ${
-    isFavorited ? "text-pink-600" : "hover:text-pink-600"
-  }`}
-  onClick={async () => {
-    if (!currentUser) {
-      setClickedName("Favorites");
-      setShowPopup(true);
-      return;
-    }
 
-    const favRef = doc(db, "users", currentUser.id, "favorites", id);
+            {/* Add to Favorites */}
+            <span
+              className={`flex items-center gap-1 cursor-pointer transition-colors ${isFavorited ? "text-pink-600" : "hover:text-pink-600"}`}
+              onClick={async () => {
+                if (!currentUser) {
+                  setClickedName("Favorites");
+                  setShowPopup(true);
+                  return;
+                }
 
-    if (isFavorited) {
-      // Remove favorite
-      await setDoc(favRef, {}, { merge: false }); // or deleteDoc(favRef)
-      setIsFavorited(false);
-    } else {
-      // Add favorite
-      await setDoc(favRef, { videoId: id, addedAt: Timestamp.now() });
-      setIsFavorited(true);
-      setFavSuccess(true);
-      setTimeout(() => setFavSuccess(false), 2000);
-    }
-  }}
->
-  <FaPlus /> Favorite
-</span>
+                const favRef = doc(db, "users", currentUser.id, "favorites", id);
 
-{favSuccess && <p className="ml-2 text-xs text-green-400">Added!</p>}
-
-
-
+                if (isFavorited) {
+                  await setDoc(favRef, {}, { merge: false });
+                  setIsFavorited(false);
+                } else {
+                  await setDoc(favRef, { videoId: id, addedAt: Timestamp.now() });
+                  setIsFavorited(true);
+                  setFavSuccess(true);
+                  setTimeout(() => setFavSuccess(false), 2000);
+                }
+              }}
+            >
+              <FaPlus /> Favorite
+            </span>
+            {favSuccess && <p className="ml-2 text-xs text-green-400">Added!</p>}
           </div>
 
+          {/* Comment Section */}
           {showComments && (
             <CommentSection
               comments={comments}
@@ -506,6 +563,7 @@ useEffect(() => {
               db={db}
               videoId={id}
               guestId={guestId}
+              currentUser={currentUser}
             />
           )}
         </div>
