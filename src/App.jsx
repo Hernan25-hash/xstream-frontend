@@ -23,6 +23,7 @@ import Profile from "./components/Profile";
 import Settings from "./components/Settings";
 import Advertise from "./components/Advertise";
 import SignUp from "./pages/SignUp";
+import ResetPassword from "./pages/ResetPassword"; // ✅ Import ResetPassword
 
 // 🚦 Route guard for 18+ check + deep link awareness
 const RequireAwareness = ({ children }) => {
@@ -190,6 +191,16 @@ function AppContent() {
             element={
               <RequireAwareness>
                 <SignUp />
+              </RequireAwareness>
+            }
+          />
+
+          {/* ✅ Reset Password */}
+          <Route
+            path="/reset-password"
+            element={
+              <RequireAwareness>
+                <ResetPassword />
               </RequireAwareness>
             }
           />

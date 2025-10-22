@@ -29,6 +29,53 @@ const getGuestId = () => {
   return guestId;
 };
 
+// ✅ VideoCard Component
+const VideoCard = ({ video, db, navigate }) => {
+  const [hearts, setHearts] = useState(video.hearts || 0);
+  const [commentsCount, setCommentsCount] = useState(video.commentsCount || 0);
+
+  useEffect(() => {
+    const videoRef = doc(db, "videos", video.id);
+    const unsubscribe = onSnapshot(videoRef, (snapshot) => {
+      const data = snapshot.data();
+      if (data) setHearts(data.hearts || 0);
+    });
+    return () => unsubscribe();
+  }, [db, video.id]);
+
+  useEffect(() => {
+    const commentsRef = collection(db, "videos", video.id, "comments");
+    const unsubscribe = onSnapshot(commentsRef, (snapshot) => {
+      setCommentsCount(snapshot.size);
+    });
+    return () => unsubscribe();
+  }, [db, video.id]);
+
+  return (
+    <div
+      className="overflow-hidden transition-transform bg-gray-800 shadow-lg cursor-pointer hover:scale-105"
+      onClick={() => navigate(`/embed/${video.id}`)}
+    >
+      <div className="relative">
+        {video.thumbnail ? (
+          <img
+            src={video.thumbnail}
+            alt={video.description || ""}
+            className="object-cover w-full aspect-video"
+          />
+        ) : (
+          <div className="w-full bg-black rounded-t-lg aspect-video" />
+        )}
+      </div>
+      <div className="text-[10px] text-gray-300 line-clamp-2 px-2 pt-1">{video.description}</div>
+      <div className="flex items-center gap-2 text-[10px] text-gray-400 px-2 pb-2">
+        <span>❤️ {hearts}</span>
+        <span>💬 {commentsCount}</span>
+      </div>
+    </div>
+  );
+};
+
 const TopRated = () => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,18 +91,16 @@ const TopRated = () => {
   const auth = getAuth(app);
   const navigate = useNavigate();
 
-  // ✅ Fetch authenticated user (same as Dashboard)
+  // ✅ Fetch authenticated user
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
           const userRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userRef);
-
           if (userSnap.exists()) {
             setUser(userSnap.data());
           } else {
-            console.warn("No user document found for:", currentUser.uid);
             setUser({
               uid: currentUser.uid,
               email: currentUser.email,
@@ -78,7 +123,6 @@ const TopRated = () => {
         setUser(null); // guest
       }
     });
-
     return () => unsubscribe();
   }, [auth, db]);
 
@@ -123,7 +167,6 @@ const TopRated = () => {
 
   return (
     <div className="relative min-h-screen text-white bg-gray-900">
-      {/* ✅ Top Navigation */}
       <TopNav
         user={user}
         search={search}
@@ -140,7 +183,6 @@ const TopRated = () => {
         loading={loading}
       />
 
-      {/* ✅ Search Modal */}
       {showSearchModal && (
         <SearchResultsModal
           searchTerm={search}
@@ -155,7 +197,6 @@ const TopRated = () => {
 
       <Banner />
 
-      {/* ✅ Video Grid */}
       <main className="max-w-[90rem] mx-auto px-4 pt-6 pb-12">
         <h2 className="mb-4 text-2xl font-semibold">Top Rated Videos</h2>
 
@@ -163,30 +204,7 @@ const TopRated = () => {
           {loading
             ? Array.from({ length: 12 }).map((_, idx) => <VideoSkeleton key={idx} />)
             : filteredVideos.slice(0, visibleCount).map((v) => (
-                <div
-                  key={v.id}
-                  className="overflow-hidden transition-transform bg-gray-800 shadow-lg cursor-pointer hover:scale-105"
-                  onClick={() => navigate(`/embed/${v.id}`)}
-                >
-                  <div className="relative">
-                    {v.thumbnail ? (
-                      <img
-                        src={v.thumbnail}
-                        alt={v.description || ""}
-                        className="object-cover w-full aspect-video"
-                      />
-                    ) : (
-                      <div className="w-full bg-black rounded-t-lg aspect-video" />
-                    )}
-                  </div>
-
-                  <div className="text-[10px] text-gray-300 line-clamp-2 px-2 pt-1">{v.description}</div>
-
-                  <div className="flex items-center gap-2 text-[10px] text-gray-400 px-2 pb-2">
-                    <span>❤️ {v.hearts || 0}</span>
-                    <span>💬 {v.commentsCount || 0}</span>
-                  </div>
-                </div>
+                <VideoCard key={v.id} video={v} db={db} navigate={navigate} />
               ))}
         </div>
 
