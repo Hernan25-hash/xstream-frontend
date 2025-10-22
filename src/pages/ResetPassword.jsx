@@ -1,44 +1,62 @@
 import React, { useState, useEffect } from "react";
-import { getAuth, updatePassword } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
+import { getAuth, verifyPasswordResetCode, confirmPasswordReset } from "firebase/auth";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
 const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [oobCode, setOobCode] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const auth = getAuth();
 
   useEffect(() => {
-    // Redirect if no user is logged in (safety)
-    if (!auth.currentUser) {
-      navigate("/signin");
+    // Extract oobCode from URL
+    const code = searchParams.get("oobCode");
+    const mode = searchParams.get("mode");
+
+    if (!code || mode !== "resetPassword") {
+      setMessage({ type: "error", text: "❌ Invalid or expired link." });
+      setLoading(false);
+      return;
     }
-  }, [auth, navigate]);
+
+    setOobCode(code);
+
+    // Verify code is valid
+    verifyPasswordResetCode(auth, code)
+      .then(() => setLoading(false))
+      .catch((err) => {
+        console.error("Invalid reset code:", err);
+        setMessage({ type: "error", text: "❌ Invalid or expired link." });
+        setLoading(false);
+      });
+  }, [auth, searchParams]);
 
   const handleReset = async (e) => {
     e.preventDefault();
     if (!newPassword) return;
 
+    setActionLoading(true);
     try {
-      setLoading(true);
-      const user = auth.currentUser;
-      if (!user) throw new Error("User not logged in.");
-
-      await updatePassword(user, newPassword);
-
+      await confirmPasswordReset(auth, oobCode, newPassword);
       setMessage({ type: "success", text: "✅ Password updated successfully! Redirecting..." });
 
-      setTimeout(() => navigate("/"), 2000);
-    } catch (error) {
-      console.error("Password update error:", error);
-      setMessage({ type: "error", text: "❌ Failed to update password. Please try again." });
+      // Redirect after 2 seconds
+      setTimeout(() => navigate("/signin"), 2000);
+    } catch (err) {
+      console.error("Password reset failed:", err);
+      setMessage({ type: "error", text: "❌ Failed to reset password. Try again." });
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
+
+  if (loading) return <p className="mt-10 text-center text-white">Loading...</p>;
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4 bg-gray-900">
@@ -56,7 +74,6 @@ const ResetPassword = () => {
         </p>
 
         <form onSubmit={handleReset} className="space-y-4">
-          {/* New Password */}
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
@@ -77,10 +94,10 @@ const ResetPassword = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={actionLoading}
             className="w-full py-3 text-sm font-semibold text-white transition shadow-lg bg-gradient-to-r from-pink-500 to-purple-500 rounded-xl hover:scale-105 disabled:opacity-50"
           >
-            {loading ? "Updating..." : "Set Password"}
+            {actionLoading ? "Updating..." : "Set Password"}
           </button>
         </form>
 

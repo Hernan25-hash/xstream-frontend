@@ -110,7 +110,7 @@ const SignUp = () => {
     }
     try {
       await sendPasswordResetEmail(auth, signInData.email);
-      alert("Password reset email sent! Please check your inbox.");
+      alert("Password reset email sent! Please check your inbox or spam.");
     } catch (error) {
       console.error("Password reset error:", error);
       alert("Failed to send reset email. Please check your email address.");
