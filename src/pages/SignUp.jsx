@@ -6,9 +6,16 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendPasswordResetEmail, // ✅ added
+  sendPasswordResetEmail,
+  updateProfile,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  addDoc,
+} from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import googleLogo from "/social/google.png";
 
@@ -24,6 +31,15 @@ const SignUp = () => {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+
+  // ✨ Toast message
+  const [toast, setToast] = useState({ message: "", type: "" });
+
+  // Helper: show toast
+  const showToast = (message, type = "info", duration = 3000) => {
+    setToast({ message, type });
+    setTimeout(() => setToast({ message: "", type: "" }), duration);
+  };
 
   // ✨ Handle Google Auth
   const handleGoogleAuth = async () => {
@@ -44,12 +60,22 @@ const SignUp = () => {
           provider: "google",
           createdAt: new Date().toISOString(),
         });
+
+        // ✅ Create welcome notification
+        const notifRef = collection(db, "users", user.uid, "notifications");
+        await addDoc(notifRef, {
+          message: "Welcome to XStream!",
+          type: "system",
+          createdAt: new Date().toISOString(),
+          read: false,
+        });
       }
 
+      showToast(`Welcome back, ${user.displayName || "user"}!`, "success");
       navigate("/");
     } catch (error) {
       console.error("Google sign-in error:", error);
-      alert("Google Sign-In failed. Please try again.");
+      showToast("Google Sign-In failed. Please try again.", "error");
     } finally {
       setLoading(false);
     }
@@ -66,18 +92,37 @@ const SignUp = () => {
         signUpData.password
       );
 
+      await updateProfile(user, { displayName: signUpData.username });
+
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         username: signUpData.username,
+        displayName: signUpData.username,
         email: signUpData.email,
         provider: "email",
         createdAt: new Date().toISOString(),
       });
 
+      const notifRef = collection(db, "users", user.uid, "notifications");
+      await addDoc(notifRef, {
+        message: "Welcome to XStream!",
+        type: "system",
+        createdAt: new Date().toISOString(),
+        read: false,
+      });
+
+      showToast("Account created successfully! 🎉", "success");
       navigate("/");
     } catch (error) {
       console.error("Signup error:", error);
-      alert(error.message);
+      let msg = "Something went wrong.";
+      if (error.code === "auth/email-already-in-use")
+        msg = "Email already in use. Try signing in instead.";
+      else if (error.code === "auth/invalid-email")
+        msg = "Please enter a valid email.";
+      else if (error.code === "auth/weak-password")
+        msg = "Password should be at least 6 characters.";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -93,10 +138,18 @@ const SignUp = () => {
         signInData.email,
         signInData.password
       );
+      showToast("Signed in successfully! 👋", "success");
       navigate("/");
     } catch (error) {
       console.error("Signin error:", error);
-      alert(error.message);
+      let msg = "Login failed.";
+      if (error.code === "auth/user-not-found")
+        msg = "No account found with that email.";
+      else if (error.code === "auth/wrong-password")
+        msg = "Incorrect password. Try again.";
+      else if (error.code === "auth/invalid-email")
+        msg = "Invalid email format.";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -105,20 +158,44 @@ const SignUp = () => {
   // 🔑 Forgot Password Handler
   const handlePasswordReset = async () => {
     if (!signInData.email) {
-      alert("Please enter your email first.");
+      showToast("Please enter your email first.", "info");
       return;
     }
     try {
       await sendPasswordResetEmail(auth, signInData.email);
-      alert("Password reset email sent! Please check your inbox or spam.");
+      showToast(
+        "Password reset email sent! Please check your inbox or spam.",
+        "success"
+      );
     } catch (error) {
       console.error("Password reset error:", error);
-      alert("Failed to send reset email. Please check your email address.");
+      let msg = "Failed to send reset email.";
+      if (error.code === "auth/user-not-found")
+        msg = "No user found with that email.";
+      showToast(msg, "error");
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-black">
+    <div className="relative flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 to-black">
+      {/* 🔔 Toast Notification */}
+      {toast.message && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className={`fixed top-5 px-4 py-2 rounded-lg shadow-lg text-sm font-medium z-50 ${
+            toast.type === "success"
+              ? "bg-green-600 text-white"
+              : toast.type === "error"
+              ? "bg-red-600 text-white"
+              : "bg-gray-700 text-white"
+          }`}
+        >
+          {toast.message}
+        </motion.div>
+      )}
+
       {/* 3D Flip Card */}
       <motion.div
         className="relative w-[90%] sm:w-[360px] h-[460px]"
@@ -142,7 +219,6 @@ const SignUp = () => {
               Sign In
             </h2>
             <form onSubmit={handleSignIn} className="space-y-4">
-              {/* Email */}
               <input
                 type="email"
                 required
@@ -154,7 +230,6 @@ const SignUp = () => {
                 className="w-full px-3 py-2 text-sm text-white placeholder-gray-400 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-600"
               />
 
-              {/* Password */}
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -184,7 +259,6 @@ const SignUp = () => {
               </button>
             </form>
 
-            {/* 🔹 Forgot Password */}
             <p className="mt-3 text-sm text-center text-gray-400">
               Forgot your password?{" "}
               <button
@@ -196,14 +270,12 @@ const SignUp = () => {
               </button>
             </p>
 
-            {/* Divider */}
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-gray-700"></div>
               <span className="px-2 text-xs text-gray-400">OR</span>
               <div className="flex-1 h-px bg-gray-700"></div>
             </div>
 
-            {/* Google Sign In */}
             <button
               onClick={handleGoogleAuth}
               disabled={loading}
@@ -239,7 +311,6 @@ const SignUp = () => {
               Create Account
             </h2>
             <form onSubmit={handleSignUp} className="space-y-4">
-              {/* Username */}
               <input
                 type="text"
                 required
@@ -251,7 +322,6 @@ const SignUp = () => {
                 className="w-full px-3 py-2 text-sm text-white placeholder-gray-400 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-600"
               />
 
-              {/* Email */}
               <input
                 type="email"
                 required
@@ -263,7 +333,6 @@ const SignUp = () => {
                 className="w-full px-3 py-2 text-sm text-white placeholder-gray-400 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-600"
               />
 
-              {/* Password */}
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -293,14 +362,12 @@ const SignUp = () => {
               </button>
             </form>
 
-            {/* Divider */}
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-gray-700"></div>
               <span className="px-2 text-xs text-gray-400">OR</span>
               <div className="flex-1 h-px bg-gray-700"></div>
             </div>
 
-            {/* Google Sign Up */}
             <button
               onClick={handleGoogleAuth}
               disabled={loading}

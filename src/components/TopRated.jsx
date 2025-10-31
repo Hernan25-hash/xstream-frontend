@@ -129,18 +129,20 @@ const TopRated = () => {
   // ✅ Fetch top rated videos
   useEffect(() => {
     const q = collection(db, "videos");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const vids = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          const engagement = (data.hearts || 0) + (data.commentsCount || 0);
-          return { id: doc.id, engagement, ...data };
-        })
-        .filter((v) => v.engagement > 0)
-        .sort((a, b) => b.engagement - a.engagement);
-      setVideos(vids);
-      setLoading(false);
-    });
+   const unsubscribe = onSnapshot(q, (snapshot) => {
+  const vids = snapshot.docs
+    .map((doc) => {
+      const data = doc.data();
+      const engagement = (data.hearts || 0) + (data.commentsCount || 0);
+      return { id: doc.id, engagement, ...data };
+    })
+    .filter((v) => v.engagement > 0 && !v.exclusive) // 🚫 exclude exclusive videos
+    .sort((a, b) => b.engagement - a.engagement);
+
+  setVideos(vids);
+  setLoading(false);
+});
+
 
     return () => unsubscribe();
   }, [db]);

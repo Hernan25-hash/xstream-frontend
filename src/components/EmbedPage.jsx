@@ -28,6 +28,7 @@ import { TopNav } from "../components/TopNav";
 import Banner from "../components/Banner";
 import Loading from "../components/Loading";
 import SearchResultsModal from "../components/SearchResultsModal";
+import { setExclusiveAccessStarted, initExclusiveVisibilityHandler } from "../utils/exclusiveAccess";
 
 // ---------------- Helper Functions ----------------
 const formatViews = (num = 0) => {
@@ -54,7 +55,7 @@ const getAuthorName = (user) => {
 };
 
 // ---------------- CommentSection ----------------
-const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubmit, db, videoId, guestId, currentUser }) => {
+const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubmit, db, videoId, guestId, currentUser, video }) => {
   const [replyInputs, setReplyInputs] = useState({});
   const formatGuestName = (id) => (id ? `Guest-${id.substring(6, 12)}` : "Guest");
 
@@ -101,105 +102,138 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
     await updateDoc(commentRef, { replies: updatedReplies });
   };
 
+  // Exclusive access effect for comment area: resume/pause only when video is exclusive
+  useEffect(() => {
+    if (!currentUser?.id || !video?.exclusive) return;
+
+    // When comment section mounts for an exclusive video, resume exclusive timer for this user
+    try {
+      setExclusiveAccessStarted(db, currentUser.id, true);
+    } catch (err) {
+      console.warn("setExclusiveAccessStarted failed", err);
+    }
+
+    // Install visibility handler (pauses/resumes on tab hide/show)
+    let cleanup = null;
+    try {
+      cleanup = initExclusiveVisibilityHandler(db, currentUser.id);
+    } catch (err) {
+      console.warn("initExclusiveVisibilityHandler failed", err);
+    }
+
+    return () => {
+      // pause when leaving comment section / unmount
+      try {
+        if (cleanup) cleanup();
+      } catch (err) {
+        // noop
+      }
+      try {
+        setExclusiveAccessStarted(db, currentUser.id, false);
+      } catch (err) {
+        console.warn("pause on unmount failed", err);
+      }
+    };
+  }, [currentUser?.id, db, video]);
+
   return (
     <div className="mt-6">
-  <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
+      <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
 
-  {/* New Comment Input */}
-  <form onSubmit={handleCommentSubmit} className="flex items-start gap-2 mb-4">
-    {/* Avatar */}
-    <div className="flex flex-col items-center">
-      <img
-        src="/avatar/profile.png"  // default avatar
-        alt="User Avatar"
-        className="flex-shrink-0 w-8 h-8 rounded-full"
-      />
-      <span className="mt-1 text-xs font-semibold text-center text-pink-400">
-        {currentUser?.displayName || currentUser?.username || "User"}
-      </span>
-    </div>
-
-    {/* Input + Button */}
-    <div className="flex flex-1 gap-2">
-      <input
-        type="text"
-        value={newComment}
-        onChange={(e) => setNewComment(e.target.value)}
-        placeholder="Add a comment..."
-        className="flex-1 p-2 text-white bg-gray-800 border border-gray-600 rounded"
-      />
-      <button type="submit" className="px-4 py-2 text-white bg-pink-600 rounded">
-        Post
-      </button>
-    </div>
-  </form>
-
-  {/* Comments List */}
-  <div className="space-y-3">
-    {comments.map((comment) => (
-      <div key={comment.id} className="p-3 bg-gray-900 rounded">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Default avatar for each comment */}
-            <img
-              src="/avatar/profile.png"
-              alt="User Avatar"
-              className="w-6 h-6 rounded-full"
-            />
-            <p className="text-sm font-semibold text-pink-400">
-              {comment.authorName || formatGuestName(comment.author)}
-            </p>
-          </div>
-
-          {(currentUser?.id === comment.author || guestId === comment.author) && (
-            <button
-              onClick={() => handleDeleteComment(comment.id, comment.author)}
-              className="text-xs text-gray-400 transition hover:text-red-500"
-            >
-              Delete
-            </button>
-          )}
+      {/* New Comment Input */}
+      <form onSubmit={handleCommentSubmit} className="flex items-start gap-2 mb-4">
+        {/* Avatar */}
+        <div className="flex flex-col items-center">
+          <img
+            src="/avatar/profile.png"  // default avatar
+            alt="User Avatar"
+            className="flex-shrink-0 w-8 h-8 rounded-full"
+          />
+          <span className="mt-1 text-xs font-semibold text-center text-pink-400">
+            {currentUser?.displayName || currentUser?.username || "User"}
+          </span>
         </div>
 
-        <p className="mt-1 text-sm text-white">{comment.text}</p>
+        {/* Input + Button */}
+        <div className="flex flex-1 gap-2">
+          <input
+            type="text"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Add a comment..."
+            className="flex-1 p-2 text-white bg-gray-800 border border-gray-600 rounded"
+          />
+          <button type="submit" className="px-4 py-2 text-white bg-pink-600 rounded">
+            Post
+          </button>
+        </div>
+      </form>
 
-        {/* Replies */}
-        <div className="mt-2 ml-4 space-y-2">
-          {comment.replies?.map((reply, idx) => (
-            <div key={idx} className="p-2 bg-gray-800 rounded">
+      {/* Comments List */}
+      <div className="space-y-3">
+        {comments.map((comment) => (
+          <div key={comment.id} className="p-3 bg-gray-900 rounded">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
+                {/* Default avatar for each comment */}
                 <img
                   src="/avatar/profile.png"
                   alt="User Avatar"
-                  className="w-5 h-5 rounded-full"
+                  className="w-6 h-6 rounded-full"
                 />
-                <p className="text-xs font-semibold text-pink-400">
-                  {reply.authorName || formatGuestName(reply.author)}
+                <p className="text-sm font-semibold text-pink-400">
+                  {comment.authorName || formatGuestName(comment.author)}
                 </p>
               </div>
-              <p className="text-xs text-white">{reply.text}</p>
+
+              {(currentUser?.id === comment.author || guestId === comment.author) && (
+                <button
+                  onClick={() => handleDeleteComment(comment.id, comment.author)}
+                  className="text-xs text-gray-400 transition hover:text-red-500"
+                >
+                  Delete
+                </button>
+              )}
             </div>
-          ))}
 
-          {/* Reply Form */}
-          <form onSubmit={(e) => handleReplySubmit(e, comment.id)} className="flex gap-2 mt-1">
-            <input
-              type="text"
-              value={replyInputs[comment.id] || ""}
-              onChange={(e) => handleReplyChange(comment.id, e.target.value)}
-              placeholder="Reply..."
-              className="flex-1 p-1 text-xs text-white bg-gray-800 border border-gray-600 rounded"
-            />
-            <button type="submit" className="px-2 py-1 text-xs text-white bg-pink-600 rounded">
-              Reply
-            </button>
-          </form>
-        </div>
+            <p className="mt-1 text-sm text-white">{comment.text}</p>
+
+            {/* Replies */}
+            <div className="mt-2 ml-4 space-y-2">
+              {comment.replies?.map((reply, idx) => (
+                <div key={idx} className="p-2 bg-gray-800 rounded">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src="/avatar/profile.png"
+                      alt="User Avatar"
+                      className="w-5 h-5 rounded-full"
+                    />
+                    <p className="text-xs font-semibold text-pink-400">
+                      {reply.authorName || formatGuestName(reply.author)}
+                    </p>
+                  </div>
+                  <p className="text-xs text-white">{reply.text}</p>
+                </div>
+              ))}
+
+              {/* Reply Form */}
+              <form onSubmit={(e) => handleReplySubmit(e, comment.id)} className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  value={replyInputs[comment.id] || ""}
+                  onChange={(e) => handleReplyChange(comment.id, e.target.value)}
+                  placeholder="Reply..."
+                  className="flex-1 p-1 text-xs text-white bg-gray-800 border border-gray-600 rounded"
+                />
+                <button type="submit" className="px-2 py-1 text-xs text-white bg-pink-600 rounded">
+                  Reply
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
       </div>
-    ))}
-  </div>
-</div>
-
+    </div>
   );
 };
 
@@ -244,6 +278,12 @@ const EmbedPage = ({ user }) => {
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [favSuccess, setFavSuccess] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
+
+  // Exclusive states
+  const [exclusiveAccessExpiry, setExclusiveAccessExpiry] = useState(null);
+  const [exclusiveAccessRemaining, setExclusiveAccessRemaining] = useState(null);
+  const [exclusiveAccessStarted, setExclusiveAccessStartedLocal] = useState(false);
+  const [showLockedModal, setShowLockedModal] = useState(false);
 
   // TopNav search state
   const [search, setSearch] = useState("");
@@ -296,6 +336,20 @@ const EmbedPage = ({ user }) => {
     return () => unsubscribe();
   }, [auth, user]);
 
+  // Listen to user's exclusive fields (read-only here)
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const userRef = doc(db, "users", currentUser.id);
+    const unsub = onSnapshot(userRef, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      setExclusiveAccessExpiry(data.exclusiveAccessExpiry || null);
+      setExclusiveAccessRemaining(data.exclusiveAccessRemaining ?? null);
+      setExclusiveAccessStartedLocal(data.exclusiveAccessStarted ?? false);
+    });
+    return () => unsub();
+  }, [currentUser?.id, db]);
+
   // Fetch video
   useEffect(() => {
     if (!id) return;
@@ -306,6 +360,7 @@ const EmbedPage = ({ user }) => {
         const videoData = snap.data();
         setVideo({ ...videoData, id: snap.id });
         setHasLiked(videoData.likedBy?.includes(currentUser?.id || guestId) || false);
+        // increment views
         await updateDoc(videoRefDoc, { views: increment(1) });
       } else setVideo(null);
     };
@@ -322,7 +377,102 @@ const EmbedPage = ({ user }) => {
     return () => unsubscribe();
   }, [id, db, guestId, currentUser]);
 
-  // Fetch all videos
+  // Decide whether to show locked modal when an exclusive video is opened
+  useEffect(() => {
+    // Only evaluate when video loaded
+    if (!video) return;
+
+    // If video is not exclusive, ensure locked modal is false and do nothing
+    if (!video.exclusive) {
+      setShowLockedModal(false);
+      return;
+    }
+
+    // If user not logged in -> locked
+    if (!currentUser?.id) {
+      setShowLockedModal(true);
+      return;
+    }
+
+    // If user has no expiry or no remaining -> locked
+    const now = Date.now();
+    const expiryMs = exclusiveAccessExpiry ? Date.parse(exclusiveAccessExpiry) : 0;
+    const hasRemaining = typeof exclusiveAccessRemaining === "number" && exclusiveAccessRemaining > 0;
+    const stillValid = expiryMs && expiryMs > now;
+
+    if (!hasRemaining || !stillValid) {
+      setShowLockedModal(true);
+      return;
+    }
+
+    // Otherwise user has time and validity -> unlocked
+    setShowLockedModal(false);
+  }, [video, currentUser?.id, exclusiveAccessExpiry, exclusiveAccessRemaining]);
+
+  // Auto-resume / auto-pause exclusive timer while viewing an exclusive video
+  useEffect(() => {
+    if (!video) return;
+
+    // we only handle exclusive videos here
+    if (!video.exclusive) return;
+
+    // If there's no logged-in user, we can't toggle exclusive flag — just ensure locked modal is shown
+    if (!currentUser?.id) {
+      setShowLockedModal(true);
+      return;
+    }
+
+    const now = Date.now();
+    const expiryMs = exclusiveAccessExpiry ? Date.parse(exclusiveAccessExpiry) : 0;
+    const hasRemaining = typeof exclusiveAccessRemaining === "number" && exclusiveAccessRemaining > 0;
+    const stillValid = expiryMs && expiryMs > now;
+
+    // If user doesn't have time left — don't resume, show locked
+    if (!hasRemaining || !stillValid) {
+      setShowLockedModal(true);
+      // ensure we set Firestore started=false just in case (admin-only updates aside)
+      try {
+        setExclusiveAccessStarted(db, currentUser.id, false);
+      } catch (err) {
+        console.warn("Failed to setExclusiveAccessStarted(false):", err);
+      }
+      return;
+    }
+
+    // Now user has remaining time -> resume locally and in Firestore
+    let cleanupVisibility = null;
+    (async () => {
+      try {
+        await setExclusiveAccessStarted(db, currentUser.id, true);
+      } catch (err) {
+        console.warn("setExclusiveAccessStarted(true) failed:", err);
+      }
+
+      // Install visibility handler (uses your util to pause on tab hide and resume on show)
+      try {
+        cleanupVisibility = initExclusiveVisibilityHandler(db, currentUser.id);
+      } catch (err) {
+        console.warn("initExclusiveVisibilityHandler failed:", err);
+      }
+    })();
+
+    // Unmount cleanup: pause when leaving this Embed page
+    return () => {
+      try {
+        if (cleanupVisibility) cleanupVisibility();
+      } catch (err) {
+        // noop
+      }
+      try {
+        setExclusiveAccessStarted(db, currentUser.id, false);
+      } catch (err) {
+        console.warn("Failed to pause exclusive on leave:", err);
+      }
+    };
+    // run when video changes, or exclusive-related fields change
+  }, [video, currentUser?.id, exclusiveAccessExpiry, exclusiveAccessRemaining, db]);
+
+  // Fetch all videos (related list)
   useEffect(() => {
     const q = collection(db, "videos");
     const unsubscribe = onSnapshot(q, (snap) => {
@@ -564,12 +714,41 @@ const EmbedPage = ({ user }) => {
               videoId={id}
               guestId={guestId}
               currentUser={currentUser}
+              video={video}
             />
           )}
         </div>
 
-        <Related relatedVideos={fallbackVideos} className="mt-6 lg:mt-0" />
+        <Related
+  relatedVideos={fallbackVideos}
+  currentVideoId={video.id}     // Pass current video ID
+  isCurrentExclusive={video.exclusive} // Pass whether current video is exclusive
+  className="mt-6 lg:mt-0"
+/>
+
       </div>
+
+      {/* Locked Modal */}
+      {showLockedModal && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-md">
+          <div className="p-6 text-center bg-gray-900 border border-gray-700 rounded-2xl">
+            <h2 className="mb-3 text-lg font-semibold text-pink-500">Access Required</h2>
+            <p className="mb-4 text-sm text-gray-300">
+              Your premium access has expired or isn’t active. Please top up to unlock exclusive videos.
+            </p>
+            <button
+              onClick={() => {
+                // close modal and navigate to Exclusive page for top up
+                setShowLockedModal(false);
+                navigate("/exclusive");
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-pink-600 rounded-lg hover:bg-pink-700"
+            >
+              Top Up Now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Popup Modal */}
       {showPopup && !loadingAuth && (

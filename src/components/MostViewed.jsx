@@ -89,15 +89,19 @@ const MostViewed = () => {
   }, [auth, db]);
 
   // ✅ Fetch videos sorted by views
-  useEffect(() => {
-    const q = query(collection(db, "videos"), orderBy("views", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const vids = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setVideos(vids);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [db]);
+ useEffect(() => {
+  const q = query(collection(db, "videos"), orderBy("views", "desc"));
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const vids = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((v) => !v.exclusive); // 🚫 exclude exclusive videos
+
+    setVideos(vids);
+    setLoading(false);
+  });
+  return () => unsubscribe();
+}, [db]);
+
 
   const loadMore = () => setVisibleCount((prev) => prev + 12);
 

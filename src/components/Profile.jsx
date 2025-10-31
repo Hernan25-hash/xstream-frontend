@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { TopNav } from "./TopNav";
 import Footer from "./Footer";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth";
 import {
   getFirestore,
   doc,
@@ -17,6 +17,7 @@ import {
   limit,
   startAfter,
   Timestamp,
+  getDocs,
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import SearchResultsModal from "../components/SearchResultsModal";
@@ -25,10 +26,8 @@ import { app } from "../firebase";
 
 const videosPerPage = 8;
 
-// Skeleton component for loading
-const VideoSkeleton = () => (
-  <div className="h-48 bg-gray-800 rounded-lg animate-pulse" />
-);
+// Skeleton while loading
+const VideoSkeleton = () => <div className="h-48 bg-gray-800 rounded-lg animate-pulse" />;
 
 const formatViews = (num = 0) => {
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
@@ -59,7 +58,7 @@ const Profile = () => {
   const [lastFavoriteDoc, setLastFavoriteDoc] = useState(null);
   const [hasMoreFavorites, setHasMoreFavorites] = useState(false);
 
-  // Fetch authenticated user + Firestore data
+  // 🧩 Fetch authenticated user + Firestore data
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -67,15 +66,16 @@ const Profile = () => {
         const userSnap = await getDoc(userRef);
         let userData = userSnap.exists() ? userSnap.data() : {};
 
+        // Set defaults if missing
         const updateFields = {};
         if (!userData.accountType) updateFields.accountType = "free";
         if (!userData.role) updateFields.role = "user";
-
         if (Object.keys(updateFields).length > 0) {
           await setDoc(userRef, updateFields, { merge: true });
           userData = { ...userData, ...updateFields };
         }
 
+        // Format createdAt
         let createdAt = new Date();
         if (userData.createdAt) {
           createdAt =
@@ -86,18 +86,28 @@ const Profile = () => {
           createdAt = new Date(firebaseUser.metadata.creationTime);
         }
 
+        // 🧠 Name resolution logic
+        const finalName =
+          userData.username ||
+          userData.displayName ||
+          firebaseUser.displayName ||
+          "Guest";
+
         setUser({
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || "Guest",
+          name: finalName,
           email: firebaseUser.email,
-          avatar: userData.avatar || firebaseUser.photoURL || "/avatar/profile.png",
-          username: userData.username || firebaseUser.displayName || "Guest",
+          avatar:
+            userData.avatar ||
+            firebaseUser.photoURL ||
+            "/avatar/profile.png",
+          username: finalName,
           createdAt,
           accountType: userData.accountType || "free",
           role: userData.role || "user",
         });
 
-        setNewUsername(userData.username || firebaseUser.displayName || "Guest");
+        setNewUsername(finalName);
       } else {
         navigate("/");
       }
@@ -116,7 +126,7 @@ const Profile = () => {
     return id;
   }, []);
 
-  // Real-time favorites fetch
+  // 🩷 Real-time favorites
   useEffect(() => {
     if (!user) return;
 
@@ -177,8 +187,11 @@ const Profile = () => {
     );
   }
 
-  const phTime = format(user.createdAt, "MMMM dd, yyyy hh:mm a", { timeZone: "Asia/Manila" });
+  const phTime = format(user.createdAt, "MMMM dd, yyyy hh:mm a", {
+    timeZone: "Asia/Manila",
+  });
 
+  // ✏️ Save profile updates
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
@@ -201,13 +214,14 @@ const Profile = () => {
         role: "user",
       });
 
+      // Update Firebase Auth profile displayName (important!)
+      await updateProfile(auth.currentUser, { displayName: newUsername });
+
       setUser((prev) => ({
         ...prev,
         name: newUsername,
         username: newUsername,
         avatar: avatarUrl,
-        accountType: "free",
-        role: "user",
       }));
 
       setEditOpen(false);
@@ -242,10 +256,11 @@ const Profile = () => {
         />
       )}
 
-      
       <div className="min-h-screen px-4 py-8 pt-24 text-white bg-gray-900">
         <div className="max-w-2xl mx-auto">
-          <h1 className="mb-6 text-3xl font-bold text-center text-pink-500">Your Profile</h1>
+          <h1 className="mb-6 text-3xl font-bold text-center text-pink-500">
+            Your Profile
+          </h1>
 
           {/* Profile Card */}
           <div className="p-6 bg-gray-800 shadow-lg rounded-2xl">
@@ -259,18 +274,22 @@ const Profile = () => {
               <p className="text-gray-400">{user.email}</p>
             </div>
 
-            <div className="mt-6 space-y-3">
-              <p>
-                <span className="font-semibold text-pink-400">Username:</span> {user.username || "N/A"}
+            <div className="mt-6 space-y-2 text-sm text-gray-300">
+              <p className="flex justify-between pb-1 border-b border-gray-700/50">
+                <span className="font-medium text-pink-400/90">Username</span>
+                <span className="text-gray-200">{user.username || "N/A"}</span>
               </p>
-              <p>
-                <span className="font-semibold text-pink-400">Member Since:</span> {phTime}
+
+              <p className="flex justify-between pb-1 border-b border-gray-700/50">
+                <span className="font-medium text-pink-400/90">Member Since</span>
+                <span className="text-gray-200">{phTime}</span>
               </p>
-              <p>
-                <span className="font-semibold text-pink-400">Account Type:</span> {user.accountType}
-              </p>
-              <p>
-                <span className="font-semibold text-pink-400">Role:</span> {user.role}
+
+              <p className="flex justify-between pb-1 border-b border-gray-700/50">
+                <span className="font-medium text-pink-400/90">Account Type</span>
+                <span className="text-gray-200 capitalize">
+                  {user.accountType}
+                </span>
               </p>
             </div>
 
@@ -284,12 +303,16 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Favorites Section */}
+          {/* Favorites */}
           <div className="mt-10">
-            <h2 className="mb-4 text-xl font-bold text-pink-500">Favorite Videos</h2>
+            <h2 className="mb-4 text-xl font-bold text-pink-500">
+              Favorite Videos
+            </h2>
             <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {loadingFavorites
-                ? Array.from({ length: videosPerPage }).map((_, idx) => <VideoSkeleton key={idx} />)
+                ? Array.from({ length: videosPerPage }).map((_, idx) => (
+                    <VideoSkeleton key={idx} />
+                  ))
                 : favorites.map((v) => (
                     <div
                       key={v.id}
@@ -314,7 +337,9 @@ const Profile = () => {
                       </div>
 
                       <div className="p-2">
-                        <div className="text-[10px] text-gray-300 line-clamp-2">{v.description}</div>
+                        <div className="text-[10px] text-gray-300 line-clamp-2">
+                          {v.description}
+                        </div>
                         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-400">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -367,9 +392,13 @@ const Profile = () => {
               className="object-cover w-24 h-24 mb-4 border-2 border-pink-500 rounded-full"
             />
 
-            <h2 className="mb-4 text-xl font-semibold text-pink-500">Edit Profile</h2>
+            <h2 className="mb-4 text-xl font-semibold text-pink-500">
+              Edit Profile
+            </h2>
 
-            <label className="block mb-2 text-sm font-medium text-gray-300">Username</label>
+            <label className="block mb-2 text-sm font-medium text-gray-300">
+              Username
+            </label>
             <input
               type="text"
               value={newUsername}
@@ -377,7 +406,9 @@ const Profile = () => {
               className="w-full p-2 mb-4 text-black rounded"
             />
 
-            <label className="block mb-2 text-sm font-medium text-gray-300">Avatar</label>
+            <label className="block mb-2 text-sm font-medium text-gray-300">
+              Avatar
+            </label>
             <input
               type="file"
               accept="image/*"

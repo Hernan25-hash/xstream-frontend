@@ -7,7 +7,8 @@ import Footer from "../components/Footer";
 import { TopNav } from "../components/TopNav";
 import Banner from "../components/Banner";
 import NativeBannerModal from "../components/NativeBannerModal";
-import SocialBar from "../components/SocialBar";
+
+
 
 const formatViews = (num = 0) => {
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
@@ -87,16 +88,16 @@ useEffect(() => {
 useEffect(() => {
   const q = collection(db, "videos");
   const unsubscribe = onSnapshot(q, (snapshot) => {
-    const vids = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    const shuffledVids = shuffleArray(vids); // ✅ shuffle videos
+    const vids = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((v) => !v.exclusive); // 🚫 exclude exclusive videos
+    const shuffledVids = shuffleArray(vids);
     setVideos(shuffledVids);
     setCurrentPage(1);
     setLoading(false);
   });
-
   return () => unsubscribe();
 }, [db]);
-
 
 
   const handleNavClick = (link) => {
@@ -197,10 +198,11 @@ useEffect(() => {
           <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={paginate} />
         )}
       </main>
+     
 
       <Footer />
       <NativeBannerModal cooldown={120000} />
-      <SocialBar />
+      
     </div>
   );
 };

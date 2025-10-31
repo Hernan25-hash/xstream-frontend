@@ -1,11 +1,11 @@
 // src/components/TopNav.jsx
-import React, { useState, useMemo, useEffect } from "react"; // added useEffect
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import logoImage from "../assets/logo.png";
 import SideBar from "./SideBar";
-import Notifications from "./Notifications";
-import Loading from "./Loading"; 
-import SearchResultsModal from "./SearchResultsModal"; 
+import Notifications from "./Notifications"; // ✅ Real-time notifications
+import Loading from "./Loading";
+import SearchResultsModal from "./SearchResultsModal";
 
 const navLinks = ["HOME", "CATEGORIES", "TOP RATED", "MOST VIEWED"];
 
@@ -24,10 +24,9 @@ export const TopNav = ({
   const location = useLocation();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState(null); // added
+  const [selectedVideo, setSelectedVideo] = useState(null);
 
   // ✅ Generate guestId for non-logged-in users
   const guestId = useMemo(() => {
@@ -71,7 +70,7 @@ export const TopNav = ({
     "MOST VIEWED": "/mostviewed",
   };
 
-  // ✅ useEffect to navigate only after modal closes
+  // ✅ Navigate after selecting search result
   useEffect(() => {
     if (!showSearchModal && selectedVideo) {
       navigate(`/embed/${selectedVideo}`);
@@ -117,26 +116,8 @@ export const TopNav = ({
 
           {/* Right Section: Notifications + Profile */}
           <div className="relative flex items-center gap-3 sm:gap-4">
-            <div className="relative">
-              <button
-                onClick={() => setShowNotificationMenu((prev) => !prev)}
-                className="relative flex items-center justify-center w-8 h-8 text-white rounded-full hover:bg-gray-800"
-              >
-                <Notifications />
-              </button>
-              {showNotificationMenu && (
-                <div className="absolute right-0 z-50 w-64 mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-lg animate-fadeIn">
-                  <div className="p-3 text-sm text-gray-300 border-b border-gray-700">
-                    Notifications
-                  </div>
-                  <div className="overflow-y-auto max-h-56">
-                    <div className="p-3 text-sm text-gray-400">
-                      No new notifications
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* ✅ Real-time Notifications (self-contained dropdown) */}
+            <Notifications />
 
             {/* Profile Avatar */}
             <div className="relative">
@@ -202,24 +183,24 @@ export const TopNav = ({
                   >
                     All
                   </div>
-                  {availableCategories.length
-                    ? availableCategories.map((cat) => (
-                        <div
-                          key={cat}
-                          onClick={() => {
-                            setSelectedCategory(cat);
-                            setShowCategories(false);
-                          }}
-                          className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${
-                            selectedCategory === cat ? "bg-pink-600" : ""
-                          }`}
-                        >
-                          {cat}
-                        </div>
-                      ))
-                    : (
-                      <div className="px-3 py-1 text-gray-400">No categories</div>
-                    )}
+                  {availableCategories.length ? (
+                    availableCategories.map((cat) => (
+                      <div
+                        key={cat}
+                        onClick={() => {
+                          setSelectedCategory(cat);
+                          setShowCategories(false);
+                        }}
+                        className={`px-3 py-1 cursor-pointer text-white hover:bg-pink-600 rounded-md ${
+                          selectedCategory === cat ? "bg-pink-600" : ""
+                        }`}
+                      >
+                        {cat}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-1 text-gray-400">No categories</div>
+                  )}
                 </div>
               )}
             </div>
@@ -248,8 +229,8 @@ export const TopNav = ({
           userId={user?.id || guestId}
           onClose={() => setShowSearchModal(false)}
           onSelect={(videoId) => {
-            setSelectedVideo(videoId); // store clicked video
-            setShowSearchModal(false); // modal closes first
+            setSelectedVideo(videoId);
+            setShowSearchModal(false);
           }}
         />
       )}
@@ -288,3 +269,5 @@ export const TopNav = ({
     </>
   );
 };
+
+export default TopNav;

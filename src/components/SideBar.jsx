@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUserCircle, FaCog, FaBullhorn } from "react-icons/fa";
+import {
+  FaUserCircle,
+  FaCog,
+  FaBullhorn,
+} from "react-icons/fa";
 import logo from "../assets/logo.png";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -8,12 +12,12 @@ const SideBar = ({ isOpen, setIsOpen }) => {
   const navigate = useNavigate();
   const [showPopup, setShowPopup] = useState(false);
   const [clickedName, setClickedName] = useState("");
-  const [user, setUser] = useState(null); // store authenticated user
-  const [loadingAuth, setLoadingAuth] = useState(true); // prevent premature popup
+  const [user, setUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
   const auth = getAuth();
 
-  // ✅ Fetch current authenticated user from Firebase
+  // ✅ Firebase Auth check
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
@@ -32,28 +36,22 @@ const SideBar = ({ isOpen, setIsOpen }) => {
     return () => unsubscribe();
   }, [auth]);
 
-  // ✅ Unified click handler
+  // ✅ Navigation logic
   const handleNavigate = (path, name) => {
-    if (loadingAuth) return; // wait until auth check completes
-
+    if (loadingAuth) return;
     if (!user) {
-      // Only show popup if truly unauthenticated
       setClickedName(name);
       setShowPopup(true);
       return;
     }
-
-    // Authenticated → navigate immediately
     setIsOpen(false);
     setTimeout(() => navigate(path), 250);
   };
 
-  // ✅ Close sidebar when clicking outside
+  // ✅ Outside click close
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (isOpen && !e.target.closest("#sidebar")) {
-        setIsOpen(false);
-      }
+      if (isOpen && !e.target.closest("#sidebar")) setIsOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -61,30 +59,24 @@ const SideBar = ({ isOpen, setIsOpen }) => {
 
   return (
     <>
-      {/* Overlay Background */}
+      {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 transition-opacity duration-300 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         ></div>
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar */}
       <div
         id="sidebar"
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800 text-white shadow-2xl border-r border-gray-800 backdrop-blur-md transform transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 z-50 h-full w-64 bg-gradient-to-b from-gray-950 via-gray-900 to-gray-800 text-white shadow-2xl border-r border-gray-800 transform transition-all duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         } rounded-r-2xl`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
-          <div className="flex items-center gap-3">
-            <img
-              src={logo}
-              alt="Logo"
-              className="object-contain select-none w-14 h-14"
-            />
-          </div>
+          <img src={logo} alt="Logo" className="object-contain w-14 h-14" />
           <button
             onClick={() => setIsOpen(false)}
             className="text-2xl transition hover:text-pink-500"
@@ -94,10 +86,10 @@ const SideBar = ({ isOpen, setIsOpen }) => {
         </div>
 
         {/* Main Menu */}
-        <div className="flex flex-col gap-3 px-5 py-5 overflow-y-auto h-[calc(100%-140px)]">
+        <div className="flex flex-col gap-3 px-5 py-5 overflow-y-auto h-[calc(100%-160px)]">
           <button
             onClick={() => handleNavigate("/profile", "Profile")}
-            className="flex items-center gap-4 px-3 py-3 text-lg transition rounded-lg hover:bg-pink-600/70"
+            className="flex items-center gap-4 px-3 py-3 text-lg rounded-lg hover:bg-pink-600/70"
           >
             <FaUserCircle className="text-xl" />
             <span>Profile</span>
@@ -105,18 +97,26 @@ const SideBar = ({ isOpen, setIsOpen }) => {
 
           <button
             onClick={() => handleNavigate("/settings", "Settings")}
-            className="flex items-center gap-4 px-3 py-3 text-lg transition rounded-lg hover:bg-pink-600/70"
+            className="flex items-center gap-4 px-3 py-3 text-lg rounded-lg hover:bg-pink-600/70"
           >
             <FaCog className="text-xl" />
             <span>Settings</span>
           </button>
+
+          <button
+            onClick={() => handleNavigate("/exclusive", "Exclusive")}
+            className="flex items-center gap-4 px-3 py-3 text-lg rounded-lg hover:bg-pink-600/70"
+          >
+            <FaBullhorn className="text-xl" />
+            <span>Exclusive</span>
+          </button>
         </div>
 
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 w-full p-4 text-sm text-center text-gray-400 border-t border-gray-700">
+        <div className="absolute bottom-0 left-0 w-full p-4 text-sm text-center text-gray-400 border-t border-gray-700 bg-gray-900/30 backdrop-blur-sm">
           <button
             onClick={() => handleNavigate("/advertise", "Advertise")}
-            className="flex items-center justify-center w-full gap-2 py-2 transition rounded-lg hover:bg-gray-700"
+            className="flex items-center justify-center w-full gap-2 py-2 rounded-lg hover:bg-gray-700"
           >
             <FaBullhorn className="text-base text-pink-500" />
             <span>Advertise</span>

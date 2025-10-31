@@ -25,20 +25,30 @@ const CATEGORIES = [
   "Malaysian",
   "Asian Mix",
 ];
+import AdminUsers from "./AdminUsers";
 
 const AdminPanel = () => {
   const [embedUrl, setEmbedUrl] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [description, setDescription] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
-  const [views, setViews] = useState(0); // NEW
-  const [duration, setDuration] = useState(""); // NEW
-  const [editId, setEditId] = useState(null); // NEW
+  const [views, setViews] = useState(0);
+  const [duration, setDuration] = useState("");
+  const [exclusive, setExclusive] = useState(false); // ✅ NEW
+  const [showExclusiveIndicator, setShowExclusiveIndicator] = useState(false); // ✅ NEW
+  const [editId, setEditId] = useState(null);
   const [videos, setVideos] = useState([]);
 
   const db = getFirestore(app);
   const auth = getAuth(app);
   const navigate = useNavigate();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const goToUsers = () => {
+  navigate("/admin/users");
+  setIsSidebarOpen(false); // close sidebar after navigation
+};
+
 
   // 🔹 Fetch videos live
   useEffect(() => {
@@ -77,6 +87,7 @@ const AdminPanel = () => {
         duration: duration.trim(),
         hearts: 0,
         likedBy: [],
+        exclusive: !!exclusive, // ✅ mark as exclusive if true
       };
 
       if (editId) {
@@ -92,6 +103,13 @@ const AdminPanel = () => {
       setThumbnailUrl("");
       setViews(0);
       setDuration("");
+      setExclusive(false); // reset checkbox
+
+      // ✅ Show confirmation when marked as exclusive
+      if (exclusive) {
+        setShowExclusiveIndicator(true);
+        setTimeout(() => setShowExclusiveIndicator(false), 3000);
+      }
     } catch (err) {
       console.error("Error adding/updating video:", err);
       alert("Operation failed: " + err.message);
@@ -107,7 +125,11 @@ const AdminPanel = () => {
     setThumbnailUrl(video.thumbnail || "");
     setViews(video.views || 0);
     setDuration(video.duration || "");
+    setExclusive(video.exclusive || false);
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    
+
   };
 
   // 🔹 Delete video
@@ -133,18 +155,57 @@ const AdminPanel = () => {
     }
   };
 
+  // 🔹 Toggle exclusive button
+  const toggleExclusiveMode = () => {
+    setExclusive((prev) => !prev);
+    setShowExclusiveIndicator(true);
+    setTimeout(() => setShowExclusiveIndicator(false), 3000);
+  };
+
   return (
-    <div className="min-h-screen p-6 text-white bg-black">
+    <div className="relative min-h-screen p-6 text-white bg-black">
+      {/* ✅ Exclusive Mode Floating Indicator */}
+      {showExclusiveIndicator && (
+        <div className="absolute px-4 py-2 text-sm text-white bg-pink-600 rounded-lg shadow-lg top-4 right-4 animate-fadeIn">
+          {exclusive ? "Exclusive Mode Enabled" : "Exclusive Mode Disabled"}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-pink-600">Admin Panel</h1>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 transition bg-gray-800 border border-pink-600 rounded-lg hover:bg-pink-600"
-        >
-          Logout
-        </button>
-      </div>
+  <h1 className="text-3xl font-bold text-pink-600">Admin Panel</h1>
+  <div className="flex items-center gap-3">
+    {/* ✅ Exclusive Toggle Button */}
+    <button
+      onClick={toggleExclusiveMode}
+      className={`px-4 py-2 border rounded-lg transition ${
+        exclusive
+          ? "bg-pink-600 border-pink-600 hover:bg-pink-700"
+          : "bg-gray-800 border-gray-700 hover:bg-gray-700"
+      }`}
+    >
+      {exclusive ? "Exclusive ✓" : "Exclusive"}
+    </button>
+
+    {/* 🍔 Hamburger Menu */}
+    <button
+      onClick={() => setIsSidebarOpen(true)}
+      className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700"
+    >
+      {/* simple hamburger icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-6 h-6 text-white"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </div>
+</div>
+
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
@@ -212,6 +273,17 @@ const AdminPanel = () => {
               required
             />
 
+            {/* ✅ Exclusive optional checkbox */}
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={exclusive}
+                onChange={(e) => setExclusive(e.target.checked)}
+                className="w-4 h-4 accent-pink-600"
+              />
+              Mark as Exclusive
+            </label>
+
             <button
               type="submit"
               className="w-full py-2 font-medium text-white transition bg-pink-600 rounded hover:bg-pink-700"
@@ -260,6 +332,9 @@ const AdminPanel = () => {
                     <p className="mb-1 text-xs text-gray-500">
                       Views: {v.views || 0} • Duration: {v.duration || "N/A"}
                     </p>
+                    <p className="mb-1 text-xs text-gray-400">
+                      {v.exclusive ? "🌟 Exclusive" : ""}
+                    </p>
                     <p className="mb-3 text-xs text-gray-500">
                       {v.added ? new Date(v.added).toLocaleDateString() : ""}
                     </p>
@@ -284,6 +359,56 @@ const AdminPanel = () => {
             </div>
           )}
         </div>
+
+        {/* ✅ Sidebar Overlay */}
+{isSidebarOpen && (
+  <div
+    className="fixed inset-0 z-40 bg-black bg-opacity-50"
+    onClick={() => setIsSidebarOpen(false)}
+  ></div>
+)}
+
+{/* ✅ Sidebar Panel */}
+<div
+  className={`fixed top-0 right-0 h-full w-64 bg-gray-900 shadow-lg z-50 transform transition-transform duration-300 ${
+    isSidebarOpen ? "translate-x-0" : "translate-x-full"
+  }`}
+>
+  <div className="flex flex-col h-full">
+    <div className="flex items-center justify-between p-4 border-b border-gray-700">
+      <h2 className="text-xl font-semibold text-pink-500">Menu</h2>
+      <button
+        onClick={() => setIsSidebarOpen(false)}
+        className="text-gray-400 hover:text-white"
+      >
+        ✕
+      </button>
+    </div>
+
+    <div className="flex flex-col flex-grow p-4 space-y-3">
+      <button
+  onClick={goToUsers}
+  className="w-full py-2 text-left text-gray-300 rounded hover:bg-gray-800"
+>
+  User's
+</button>
+
+      <button className="w-full py-2 text-left text-gray-300 rounded hover:bg-gray-800">
+        Report's
+      </button>
+    </div>
+
+    <div className="p-4 border-t border-gray-700">
+      <button
+        onClick={handleLogout}
+        className="w-full py-2 text-white transition bg-red-600 rounded hover:bg-red-700"
+      >
+        Logout
+      </button>
+    </div>
+  </div>
+</div>
+
       </div>
     </div>
   );

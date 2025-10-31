@@ -23,7 +23,9 @@ import Profile from "./components/Profile";
 import Settings from "./components/Settings";
 import Advertise from "./components/Advertise";
 import SignUp from "./pages/SignUp";
-import ResetPassword from "./pages/ResetPassword"; // ✅ Import ResetPassword
+import ResetPassword from "./pages/ResetPassword";
+import Exclusive from "./components/Exclusive"; // ✅ New import
+import AdminUsers from "./admin/AdminUsers"; // ✅ New import
 
 // 🚦 Route guard for 18+ check + deep link awareness
 const RequireAwareness = ({ children }) => {
@@ -152,6 +154,16 @@ function AppContent() {
             }
           />
 
+          {/* ✅ Exclusive (New) */}
+          <Route
+            path="/exclusive"
+            element={
+              <RequireAwareness>
+                <Exclusive />
+              </RequireAwareness>
+            }
+          />
+
           {/* Admin Protected */}
           <Route
             path="/admin"
@@ -161,6 +173,16 @@ function AppContent() {
               </ProtectedAdminRoute>
             }
           />
+
+          {/* ✅ Admin Users Page */}
+<Route
+  path="/admin/users"
+  element={
+    <ProtectedAdminRoute>
+      <AdminUsers />
+    </ProtectedAdminRoute>
+  }
+/>
 
           {/* Admin Login */}
           <Route path="/login" element={<Login />} />
