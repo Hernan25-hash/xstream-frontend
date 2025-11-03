@@ -32,14 +32,14 @@ const ProtectedAdminRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
-        <div className="text-pink-500 text-lg animate-pulse">Checking access...</div>
+      <div className="flex items-center justify-center min-h-screen text-white bg-black">
+        <div className="text-lg text-pink-500 animate-pulse">Checking access...</div>
       </div>
     );
   }
 
   if (!isAdmin) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/2login" replace />;
   }
 
   return children;

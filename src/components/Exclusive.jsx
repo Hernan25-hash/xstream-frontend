@@ -52,6 +52,10 @@ const Exclusive = () => {
   const [paidInfo, setPaidInfo] = useState({ wallet: null, amount: null });
   const [showLoading, setShowLoading] = useState(false);
   const [showTransactions, setShowTransactions] = useState(false);
+  
+const [visibleCount, setVisibleCount] = useState(10); // number of videos to show initially
+const loadMore = () => setVisibleCount((prev) => prev + 10);
+
   // 🔹 Exclusive access control (listen-only)
   const [exclusiveAccessExpiry, setExclusiveAccessExpiry] = useState(null);
   const [exclusiveAccessRemaining, setExclusiveAccessRemaining] = useState(null);
@@ -115,62 +119,98 @@ const Exclusive = () => {
     return () => unsub();
   }, [db]);
 
-  // ✅ Timer: only local calculation, no Firestore updates
-  useEffect(() => {
-    if (!exclusiveAccessExpiry || exclusiveAccessRemaining == null) {
-      setTimeLeft({ usage: "", validity: "" });
+  // ✅ Accurate timer that syncs remaining time with Firestore + auto pause/resume
+useEffect(() => {
+  if (!exclusiveAccessExpiry || exclusiveAccessRemaining == null || !user?.uid) {
+    setTimeLeft({ usage: "", validity: "" });
+    return;
+  }
+
+  let remaining = exclusiveAccessRemaining;
+  const expiryMs = Date.parse(exclusiveAccessExpiry);
+  let lastTick = Date.now();
+  let interval, saveInterval;
+
+  const tick = () => {
+    const now = Date.now();
+    const validityDiff = expiryMs - now;
+
+    if (validityDiff <= 0 || remaining <= 0) {
+      setTimeLeft("Expired");
+      clearInterval(interval);
+      clearInterval(saveInterval);
       return;
     }
-    let interval;
-    const expiryMs = Date.parse(exclusiveAccessExpiry);
-    let lastUpdate = Date.now();
-    let remaining = exclusiveAccessRemaining;
 
-    if (exclusiveAccessStarted) {
-      interval = setInterval(() => {
-        const now = Date.now();
-        const elapsed = now - lastUpdate;
-        lastUpdate = now;
-        remaining -= elapsed;
-        const validityDiff = expiryMs - now;
+    const usageHrs = Math.floor(remaining / (1000 * 60 * 60));
+    const usageMins = Math.floor((remaining / (1000 * 60)) % 60);
+    const usageSecs = Math.floor((remaining / 1000) % 60);
+    const validityHrs = Math.floor(validityDiff / (1000 * 60 * 60));
+    const validityMins = Math.floor((validityDiff / (1000 * 60)) % 60);
 
-        if (validityDiff <= 0 || remaining <= 0) {
-          setTimeLeft("Expired");
-          clearInterval(interval);
-          return;
-        }
+    setTimeLeft({
+      usage: `${usageHrs}h ${usageMins}m ${usageSecs}s`,
+      validity: `${validityHrs}h ${validityMins}m`,
+    });
+  };
 
-        const usageHrs = Math.floor(remaining / (1000 * 60 * 60));
-        const usageMins = Math.floor((remaining / (1000 * 60)) % 60);
-        const usageSecs = Math.floor((remaining / 1000) % 60);
-        const validityHrs = Math.floor(validityDiff / (1000 * 60 * 60));
-        const validityMins = Math.floor((validityDiff / (1000 * 60)) % 60);
+  tick(); // initial display
 
-        setTimeLeft({
-          usage: `${usageHrs}h ${usageMins}m ${usageSecs}s`,
-          validity: `${validityHrs}h ${validityMins}m`,
-        });
-      }, 1000);
+  if (exclusiveAccessStarted) {
+    interval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastTick;
+      lastTick = now;
+      remaining -= elapsed;
+      tick();
+    }, 1000);
+
+    // 🔹 Save the remaining time back to Firestore every 10 seconds
+    saveInterval = setInterval(() => {
+      import("../utils/exclusiveAccess").then(({ updateExclusiveAccessRemaining }) => {
+        updateExclusiveAccessRemaining(db, user.uid, remaining);
+      });
+    }, 10000);
+  }
+
+  // 🔹 Save once immediately when tab/window closes or reloads
+  const handleBeforeUnload = async () => {
+    if (remaining > 0 && user?.uid) {
+      import("../utils/exclusiveAccess").then(({ updateExclusiveAccessRemaining }) => {
+        updateExclusiveAccessRemaining(db, user.uid, remaining);
+      });
+      await setExclusiveAccessStarted(db, user.uid, false);
     }
+  };
 
-    return () => clearInterval(interval);
-  }, [exclusiveAccessExpiry, exclusiveAccessRemaining, exclusiveAccessStarted]);
+  window.addEventListener("beforeunload", handleBeforeUnload);
 
- // 🔹 Handle auto pause/resume of exclusive access on tab visibility
-  useEffect(() => {
+  return () => {
+    clearInterval(interval);
+    clearInterval(saveInterval);
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+  };
+}, [exclusiveAccessExpiry, exclusiveAccessRemaining, exclusiveAccessStarted, db, user?.uid]);
+
+
+
+ // ✅ Auto pause/resume based on tab visibility — synced with Firestore
+useEffect(() => {
   if (!user?.uid) return;
 
-  // Auto resume on mount
-  setExclusiveAccessStarted(db, user.uid, true);
+  // Start if valid access time exists
+  if (exclusiveAccessExpiry && exclusiveAccessRemaining > 0) {
+    setExclusiveAccessStarted(db, user.uid, true);
+  }
 
-  // Setup auto pause/resume on tab visibility
   const cleanup = initExclusiveVisibilityHandler(db, user.uid);
 
   return () => {
-    cleanup();
-    setExclusiveAccessStarted(db, user.uid, false); // pause on unmount
+    cleanup?.();
+    setExclusiveAccessStarted(db, user.uid, false);
   };
-}, [user?.uid, db]);
+}, [user?.uid, exclusiveAccessExpiry, exclusiveAccessRemaining, db]);
+
 
   const handlePaymentSuccess = () => {
   if (!selectedWallet || !selectedRate) return;
@@ -259,63 +299,79 @@ const Exclusive = () => {
       <p>No exclusive videos available yet.</p>
     </div>
   ) : (
-    <motion.div
-      layout
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
-    >
-      {exclusiveVideos
-        .filter((v) => !selectedCategory || v.category === selectedCategory)
-        .map((v) => (
-          <motion.div
-            key={v.id}
-            whileHover={{ scale: 1.05 }}
-            className="relative overflow-hidden transition border border-gray-800 rounded-lg bg-gray-900/80 hover:border-pink-600"
-          >
-            <div
-              className="relative cursor-pointer"
-              onClick={() => {
-  if (!accessExpiry || timeLeft === "Expired") {
-  if (paidInfo?.wallet && paidInfo?.amount) {
-    // User has already paid but still processing
-    setShowTransactions(true); // ✅ correct
-  } else {
-    setShowLockedModal(true);
-  }
-} else {
-  navigate(`/embed/${v.id}`);
-}
-
-}}
-
+    <>
+      <motion.div
+        layout
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+      >
+        {exclusiveVideos
+          .filter((v) => !selectedCategory || v.category === selectedCategory)
+          .slice(0, visibleCount) // ✅ show limited videos
+          .map((v) => (
+            <motion.div
+              key={v.id}
+              whileHover={{ scale: 1.05 }}
+              className="relative overflow-hidden transition border border-gray-800 rounded-lg bg-gray-900/80 hover:border-pink-600"
             >
-              {v.thumbnail ? (
-                <img
-                  src={v.thumbnail}
-                  alt={v.description}
-                  className="object-cover w-full aspect-video"
-                />
-              ) : (
-                <div className="flex items-center justify-center w-full text-gray-500 bg-gray-800 aspect-video">
-                  No Thumbnail
-                </div>
-              )}
-              <span className="absolute top-0 right-0 px-2 py-1 text-xs font-medium text-white bg-pink-600 rounded-bl-lg">
-                EXCLUSIVE
-              </span>
-            </div>
-            <div className="px-2 py-3 text-sm">
-              <p className="mb-1 font-semibold text-pink-400 truncate">{v.category}</p>
-              <p className="text-gray-300 truncate">{v.description}</p>
-              <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
-                <span>{formatViews(v.views ?? 0)} views</span>
-                <span>{v.duration || "N/A"}</span>
+              <div
+                className="relative cursor-pointer"
+                onClick={() => {
+                  if (!accessExpiry || timeLeft === "Expired") {
+                    if (paidInfo?.wallet && paidInfo?.amount) {
+                      setShowTransactions(true);
+                    } else {
+                      setShowLockedModal(true);
+                    }
+                  } else {
+                    navigate(`/embed/${v.id}`);
+                  }
+                }}
+              >
+                {v.thumbnail ? (
+                  <img
+                    src={v.thumbnail}
+                    alt={v.description}
+                    className="object-cover w-full aspect-video"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center w-full text-gray-500 bg-gray-800 aspect-video">
+                    No Thumbnail
+                  </div>
+                )}
+                <span className="absolute top-0 right-0 px-2 py-1 text-xs font-medium text-white bg-pink-600 rounded-bl-lg">
+                  EXCLUSIVE
+                </span>
               </div>
-            </div>
-          </motion.div>
-        ))}
-    </motion.div>
-    
+              <div className="px-2 py-3 text-sm">
+                <p className="mb-1 font-semibold text-pink-400 truncate">{v.category}</p>
+                <p className="text-gray-300 truncate">{v.description}</p>
+                <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
+                  <span>{formatViews(v.views ?? 0)} views</span>
+                  <span>{v.duration || "N/A"}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+      </motion.div>
+
+      {/* ✅ Load More Button */}
+      {visibleCount <
+        exclusiveVideos.filter(
+          (v) => !selectedCategory || v.category === selectedCategory
+        ).length && (
+        <div className="flex justify-center mt-8">
+          <button
+            onClick={() => setVisibleCount((prev) => prev + 10)}
+            className="px-4 py-2 text-white transition border border-pink-600 rounded hover:bg-pink-600"
+          >
+            Load More
+          </button>
+        </div>
+      )}
+    </>
   )}
+</div>
+
    
 {showTransactions && user?.uid && (
   <div className="px-4 pb-10 sm:px-6 lg:px-10">
@@ -329,7 +385,7 @@ const Exclusive = () => {
     </button>
   </div>
 )}
-</div>
+
 
 
       {/* Locked Modal */}

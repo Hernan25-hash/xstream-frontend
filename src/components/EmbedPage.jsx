@@ -28,7 +28,7 @@ import { TopNav } from "../components/TopNav";
 import Banner from "../components/Banner";
 import Loading from "../components/Loading";
 import SearchResultsModal from "../components/SearchResultsModal";
-import { setExclusiveAccessStarted, initExclusiveVisibilityHandler } from "../utils/exclusiveAccess";
+import { setExclusiveAccessStarted, initExclusiveVisibilityHandler,runExclusiveCountdown } from "../utils/exclusiveAccess";
 
 // ---------------- Helper Functions ----------------
 const formatViews = (num = 0) => {
@@ -136,6 +136,7 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
     };
   }, [currentUser?.id, db, video]);
 
+  
   return (
     <div className="mt-6">
       <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
@@ -411,66 +412,57 @@ const EmbedPage = ({ user }) => {
 
   // Auto-resume / auto-pause exclusive timer while viewing an exclusive video
   useEffect(() => {
-    if (!video) return;
+  if (!video) return;
 
-    // we only handle exclusive videos here
-    if (!video.exclusive) return;
+  if (!video.exclusive) return;
+  if (!currentUser?.id) {
+    setShowLockedModal(true);
+    return;
+  }
 
-    // If there's no logged-in user, we can't toggle exclusive flag — just ensure locked modal is shown
-    if (!currentUser?.id) {
-      setShowLockedModal(true);
-      return;
+  const now = Date.now();
+  const expiryMs = exclusiveAccessExpiry ? Date.parse(exclusiveAccessExpiry) : 0;
+  const hasRemaining = typeof exclusiveAccessRemaining === "number" && exclusiveAccessRemaining > 0;
+  const stillValid = expiryMs && expiryMs > now;
+
+  if (!hasRemaining || !stillValid) {
+    setShowLockedModal(true);
+    try {
+      setExclusiveAccessStarted(db, currentUser.id, false);
+    } catch (err) {
+      console.warn("Failed to setExclusiveAccessStarted(false):", err);
     }
+    return;
+  }
 
-    const now = Date.now();
-    const expiryMs = exclusiveAccessExpiry ? Date.parse(exclusiveAccessExpiry) : 0;
-    const hasRemaining = typeof exclusiveAccessRemaining === "number" && exclusiveAccessRemaining > 0;
-    const stillValid = expiryMs && expiryMs > now;
+  let cleanupVisibility = null;
+  let stopCountdown = null;
 
-    // If user doesn't have time left — don't resume, show locked
-    if (!hasRemaining || !stillValid) {
-      setShowLockedModal(true);
-      // ensure we set Firestore started=false just in case (admin-only updates aside)
-      try {
-        setExclusiveAccessStarted(db, currentUser.id, false);
-      } catch (err) {
-        console.warn("Failed to setExclusiveAccessStarted(false):", err);
-      }
-      return;
+  (async () => {
+    try {
+      await setExclusiveAccessStarted(db, currentUser.id, true);
+      cleanupVisibility = initExclusiveVisibilityHandler(db, currentUser.id);
+      stopCountdown = runExclusiveCountdown(db, currentUser.id); // ⏳ start timer
+    } catch (err) {
+      console.warn("Exclusive timer setup failed:", err);
     }
+  })();
 
-    // Now user has remaining time -> resume locally and in Firestore
-    let cleanupVisibility = null;
-    (async () => {
-      try {
-        await setExclusiveAccessStarted(db, currentUser.id, true);
-      } catch (err) {
-        console.warn("setExclusiveAccessStarted(true) failed:", err);
-      }
+  return () => {
+    try {
+      if (cleanupVisibility) cleanupVisibility();
+      if (stopCountdown) stopCountdown(); // 🛑 stop timer
+    } catch (err) {
+      console.warn("Failed to cleanup exclusive timer:", err);
+    }
+    try {
+      setExclusiveAccessStarted(db, currentUser.id, false);
+    } catch (err) {
+      console.warn("Failed to pause exclusive on leave:", err);
+    }
+  };
+}, [video, currentUser?.id, exclusiveAccessExpiry, exclusiveAccessRemaining, db]);
 
-      // Install visibility handler (uses your util to pause on tab hide and resume on show)
-      try {
-        cleanupVisibility = initExclusiveVisibilityHandler(db, currentUser.id);
-      } catch (err) {
-        console.warn("initExclusiveVisibilityHandler failed:", err);
-      }
-    })();
-
-    // Unmount cleanup: pause when leaving this Embed page
-    return () => {
-      try {
-        if (cleanupVisibility) cleanupVisibility();
-      } catch (err) {
-        // noop
-      }
-      try {
-        setExclusiveAccessStarted(db, currentUser.id, false);
-      } catch (err) {
-        console.warn("Failed to pause exclusive on leave:", err);
-      }
-    };
-    // run when video changes, or exclusive-related fields change
-  }, [video, currentUser?.id, exclusiveAccessExpiry, exclusiveAccessRemaining, db]);
 
   // Fetch all videos (related list)
   useEffect(() => {

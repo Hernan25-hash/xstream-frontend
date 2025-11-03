@@ -45,7 +45,7 @@ const AdminPanel = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const goToUsers = () => {
-  navigate("/admin/users");
+  navigate("/2admin/users");
   setIsSidebarOpen(false); // close sidebar after navigation
 };
 
@@ -148,7 +148,7 @@ const AdminPanel = () => {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      navigate("/login");
+      navigate("/2login");
     } catch (error) {
       console.error("Logout error:", error);
       alert("Failed to logout. Try again.");

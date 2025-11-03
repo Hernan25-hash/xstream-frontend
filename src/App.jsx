@@ -166,7 +166,7 @@ function AppContent() {
 
           {/* Admin Protected */}
           <Route
-            path="/admin"
+            path="/2admin"
             element={
               <ProtectedAdminRoute>
                 <AdminPanel />
@@ -176,7 +176,7 @@ function AppContent() {
 
           {/* ✅ Admin Users Page */}
 <Route
-  path="/admin/users"
+  path="/2admin/users"
   element={
     <ProtectedAdminRoute>
       <AdminUsers />
@@ -185,7 +185,7 @@ function AppContent() {
 />
 
           {/* Admin Login */}
-          <Route path="/login" element={<Login />} />
+          <Route path="/2login" element={<Login />} />
 
           {/* Sponsored */}
           <Route

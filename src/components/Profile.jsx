@@ -1,4 +1,3 @@
-// C:\XStream\frontend\src\components\Profile.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { TopNav } from "./TopNav";
@@ -35,6 +34,16 @@ const formatViews = (num = 0) => {
   return num.toString();
 };
 
+// 🔹 Format remaining time
+const formatRemainingTime = (ms) => {
+  if (ms <= 0) return "Expired";
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h > 0 ? `${h}h ` : ""}${m}m ${s}s`;
+};
+
 const Profile = () => {
   const navigate = useNavigate();
   const auth = getAuth(app);
@@ -57,6 +66,9 @@ const Profile = () => {
   const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [lastFavoriteDoc, setLastFavoriteDoc] = useState(null);
   const [hasMoreFavorites, setHasMoreFavorites] = useState(false);
+
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [expiryText, setExpiryText] = useState(null);
 
   // 🧩 Fetch authenticated user + Firestore data
   useEffect(() => {
@@ -105,9 +117,25 @@ const Profile = () => {
           createdAt,
           accountType: userData.accountType || "free",
           role: userData.role || "user",
+          exclusiveAccessRemaining: userData.exclusiveAccessRemaining || 0,
+          exclusiveAccessExpiry: userData.exclusiveAccessExpiry || null,
         });
 
         setNewUsername(finalName);
+
+        // 🔹 If user has time left, start countdown
+        if (userData.exclusiveAccessRemaining > 0) {
+          setTimeLeft(userData.exclusiveAccessRemaining);
+        }
+
+        if (userData.exclusiveAccessExpiry) {
+          const expiry = new Date(userData.exclusiveAccessExpiry);
+          setExpiryText(
+            format(expiry, "MMMM dd, yyyy hh:mm a", {
+              timeZone: "Asia/Manila",
+            })
+          );
+        }
       } else {
         navigate("/");
       }
@@ -116,6 +144,15 @@ const Profile = () => {
 
     return () => unsubscribe();
   }, [auth, db, navigate]);
+
+  // 🔄 Countdown timer effect
+  useEffect(() => {
+    if (!timeLeft || timeLeft <= 0) return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => (prev && prev > 1000 ? prev - 1000 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timeLeft]);
 
   const guestId = useMemo(() => {
     let id = localStorage.getItem("xstreamGuestId");
@@ -214,7 +251,6 @@ const Profile = () => {
         role: "user",
       });
 
-      // Update Firebase Auth profile displayName (important!)
       await updateProfile(auth.currentUser, { displayName: newUsername });
 
       setUser((prev) => ({
@@ -291,6 +327,20 @@ const Profile = () => {
                   {user.accountType}
                 </span>
               </p>
+
+              {timeLeft > 0 && (
+                <p className="flex justify-between pb-1 border-b border-gray-700/50">
+                  <span className="font-medium text-pink-400/90">Time Left</span>
+                  <span className="text-gray-200">{formatRemainingTime(timeLeft)}</span>
+                </p>
+              )}
+
+              {expiryText && (
+                <p className="flex justify-between pb-1 border-b border-gray-700/50">
+                  <span className="font-medium text-pink-400/90">Valid Until</span>
+                  <span className="text-gray-200">{expiryText}</span>
+                </p>
+              )}
             </div>
 
             <div className="flex justify-center mt-6">

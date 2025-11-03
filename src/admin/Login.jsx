@@ -107,7 +107,7 @@ const Login = ({ onSuccess }) => {
 
       setSuccess("Login successful! Redirecting...");
       if (onSuccess) onSuccess();
-      navigate("/admin");
+      navigate("/2admin");
     } catch (err) {
       setError(err.message);
     }
