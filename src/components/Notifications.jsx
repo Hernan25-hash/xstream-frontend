@@ -9,6 +9,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  addDoc,
+  getDocs,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 
@@ -34,6 +36,54 @@ const Notifications = () => {
 
       setNotifications(notifList);
       setUnreadCount(notifList.filter((n) => !n.read).length);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 🔁 Real-time listener for RECEIPT updates → auto-notify user
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const receiptsRef = collection(db, "users", user.uid, "receipts");
+    const unsubscribe = onSnapshot(receiptsRef, async (snapshot) => {
+      for (const change of snapshot.docChanges()) {
+        if (change.type === "modified") {
+          const data = change.doc.data();
+          const receiptId = change.doc.id;
+
+          // Only trigger on status change
+          if (data.status && ["approved", "rejected", "cancelled"].includes(data.status)) {
+            const notifMessage =
+              data.status === "approved"
+                ? `✅ Your top-up of ₱${data.amount} has been approved!`
+                : data.status === "rejected"
+                ? `❌ Your top-up of ₱${data.amount} was rejected.`
+                : `⚠️ Your top-up of ₱${data.amount} was cancelled.`;
+
+            // Prevent duplicate notifications (same receipt + status)
+            const existingNotifs = await getDocs(
+              query(collection(db, "users", user.uid, "notifications"))
+            );
+            const alreadyExists = existingNotifs.docs.some(
+              (n) =>
+                n.data().receiptId === receiptId &&
+                n.data().status === data.status
+            );
+
+            if (!alreadyExists) {
+              await addDoc(collection(db, "users", user.uid, "notifications"), {
+                message: notifMessage,
+                read: false,
+                createdAt: new Date().toISOString(),
+                receiptId,
+                status: data.status,
+              });
+            }
+          }
+        }
+      }
     });
 
     return () => unsubscribe();
@@ -108,9 +158,7 @@ const Notifications = () => {
               <h3 className="text-sm font-semibold text-gray-100">Notifications</h3>
               {notifications.length > 0 && (
                 <span className="text-xs text-gray-400">
-                  {unreadCount > 0
-                    ? `${unreadCount} unread`
-                    : "All read ✅"}
+                  {unreadCount > 0 ? `${unreadCount} unread` : "All read ✅"}
                 </span>
               )}
             </div>

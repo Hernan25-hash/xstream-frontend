@@ -142,33 +142,40 @@ const CommentSection = ({ comments, newComment, setNewComment, handleCommentSubm
       <h3 className="mb-2 text-lg font-semibold">Comments ({comments.length})</h3>
 
       {/* New Comment Input */}
-      <form onSubmit={handleCommentSubmit} className="flex items-start gap-2 mb-4">
-        {/* Avatar */}
-        <div className="flex flex-col items-center">
-          <img
-            src="/avatar/profile.png"  // default avatar
-            alt="User Avatar"
-            className="flex-shrink-0 w-8 h-8 rounded-full"
-          />
-          <span className="mt-1 text-xs font-semibold text-center text-pink-400">
-            {currentUser?.displayName || currentUser?.username || "User"}
-          </span>
-        </div>
+<form
+  onSubmit={handleCommentSubmit}
+  className="flex flex-wrap items-start w-full gap-2 mb-4 sm:flex-nowrap"
+>
+  {/* Avatar + Username */}
+  <div className="flex flex-col items-center flex-shrink-0 w-14">
+    <img
+      src="/avatar/profile.png" // default avatar
+      alt="User Avatar"
+      className="w-8 h-8 rounded-full"
+    />
+    <span className="mt-1 text-[10px] sm:text-xs font-semibold text-center text-pink-400 break-words">
+      {currentUser?.displayName || currentUser?.username || "User"}
+    </span>
+  </div>
 
-        {/* Input + Button */}
-        <div className="flex flex-1 gap-2">
-          <input
-            type="text"
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
-            className="flex-1 p-2 text-white bg-gray-800 border border-gray-600 rounded"
-          />
-          <button type="submit" className="px-4 py-2 text-white bg-pink-600 rounded">
-            Post
-          </button>
-        </div>
-      </form>
+  {/* Input + Button */}
+  <div className="flex items-center flex-1 min-w-0 gap-2">
+    <input
+      type="text"
+      value={newComment}
+      onChange={(e) => setNewComment(e.target.value)}
+      placeholder="Add a comment..."
+      className="flex-1 min-w-0 p-2 text-sm text-white placeholder-gray-400 bg-gray-800 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-pink-500"
+    />
+    <button
+      type="submit"
+      className="flex-shrink-0 px-4 py-2 text-sm font-semibold text-white transition-all bg-pink-600 rounded hover:bg-pink-700"
+    >
+      Post
+    </button>
+  </div>
+</form>
+
 
       {/* Comments List */}
       <div className="space-y-3">
@@ -285,6 +292,8 @@ const EmbedPage = ({ user }) => {
   const [exclusiveAccessRemaining, setExclusiveAccessRemaining] = useState(null);
   const [exclusiveAccessStarted, setExclusiveAccessStartedLocal] = useState(false);
   const [showLockedModal, setShowLockedModal] = useState(false);
+  const [exclusiveDataLoaded, setExclusiveDataLoaded] = useState(false);
+
 
   // TopNav search state
   const [search, setSearch] = useState("");
@@ -347,6 +356,7 @@ const EmbedPage = ({ user }) => {
       setExclusiveAccessExpiry(data.exclusiveAccessExpiry || null);
       setExclusiveAccessRemaining(data.exclusiveAccessRemaining ?? null);
       setExclusiveAccessStartedLocal(data.exclusiveAccessStarted ?? false);
+      setExclusiveDataLoaded(true);
     });
     return () => unsub();
   }, [currentUser?.id, db]);
@@ -411,29 +421,41 @@ const EmbedPage = ({ user }) => {
   }, [video, currentUser?.id, exclusiveAccessExpiry, exclusiveAccessRemaining]);
 
   // Auto-resume / auto-pause exclusive timer while viewing an exclusive video
-  useEffect(() => {
-  if (!video) return;
+ useEffect(() => {
+  // 🧠 Wait until all required data is loaded
+  if (!video || !exclusiveDataLoaded) return;
 
-  if (!video.exclusive) return;
+  // 🎬 If not an exclusive video — skip modal & timer logic
+  if (!video.exclusive) {
+    setShowLockedModal(false);
+    return;
+  }
+
+  // 🚫 Not logged in — lock immediately
   if (!currentUser?.id) {
     setShowLockedModal(true);
     return;
   }
 
+  // ⏳ Compute access validity
   const now = Date.now();
   const expiryMs = exclusiveAccessExpiry ? Date.parse(exclusiveAccessExpiry) : 0;
   const hasRemaining = typeof exclusiveAccessRemaining === "number" && exclusiveAccessRemaining > 0;
   const stillValid = expiryMs && expiryMs > now;
 
+  // ❌ No valid access — show locked modal & stop exclusive timer
   if (!hasRemaining || !stillValid) {
     setShowLockedModal(true);
     try {
       setExclusiveAccessStarted(db, currentUser.id, false);
     } catch (err) {
-      console.warn("Failed to setExclusiveAccessStarted(false):", err);
+      console.warn("Failed to disable exclusive access:", err);
     }
     return;
   }
+
+  // ✅ Valid access — hide modal & start exclusive tracking
+  setShowLockedModal(false);
 
   let cleanupVisibility = null;
   let stopCountdown = null;
@@ -442,26 +464,35 @@ const EmbedPage = ({ user }) => {
     try {
       await setExclusiveAccessStarted(db, currentUser.id, true);
       cleanupVisibility = initExclusiveVisibilityHandler(db, currentUser.id);
-      stopCountdown = runExclusiveCountdown(db, currentUser.id); // ⏳ start timer
+      stopCountdown = runExclusiveCountdown(db, currentUser.id); // ⏳ Start timer
     } catch (err) {
       console.warn("Exclusive timer setup failed:", err);
     }
   })();
 
+  // 🧹 Cleanup when unmounting or navigating away
   return () => {
     try {
       if (cleanupVisibility) cleanupVisibility();
-      if (stopCountdown) stopCountdown(); // 🛑 stop timer
+      if (stopCountdown) stopCountdown(); // 🛑 Stop timer
     } catch (err) {
       console.warn("Failed to cleanup exclusive timer:", err);
     }
     try {
       setExclusiveAccessStarted(db, currentUser.id, false);
     } catch (err) {
-      console.warn("Failed to pause exclusive on leave:", err);
+      console.warn("Failed to pause exclusive access on leave:", err);
     }
   };
-}, [video, currentUser?.id, exclusiveAccessExpiry, exclusiveAccessRemaining, db]);
+}, [
+  video,
+  currentUser?.id,
+  exclusiveAccessExpiry,
+  exclusiveAccessRemaining,
+  exclusiveDataLoaded,
+  db,
+]);
+
 
 
   // Fetch all videos (related list)
@@ -487,30 +518,96 @@ const EmbedPage = ({ user }) => {
     return () => unsubscribe();
   }, [id, db]);
 
+  // 🧩 Ensure the video document has required fields before updating
+const ensureVideoFields = async (videoId) => {
+  const ref = doc(db, "videos", videoId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+
+  const defaults = {};
+  if (data.hearts === undefined) defaults.hearts = 0;
+  if (!Array.isArray(data.likedBy)) defaults.likedBy = [];
+  if (data.views === undefined) defaults.views = 0;
+
+  if (Object.keys(defaults).length > 0) {
+    await updateDoc(ref, defaults);
+  }
+};
+
+
   // Like handler
   const handleLike = async () => {
-    if (!id || hasLiked) return;
-    const ref = doc(db, "videos", id);
-    await updateDoc(ref, {
-      hearts: increment(1),
-      likedBy: arrayUnion(currentUser?.id || guestId),
-    });
-    setHasLiked(true);
-  };
+  if (!id || hasLiked) return;
+
+  const ref = doc(db, "videos", id);
+
+  // 🧩 Ensure required fields exist
+  await ensureVideoFields(id);
+
+  await updateDoc(ref, {
+    hearts: increment(1),
+    likedBy: arrayUnion(currentUser?.id || guestId),
+  });
+
+  setHasLiked(true);
+
+  // 🩷 Optional: Save to notifications (for uploader)
+  try {
+    if (video?.uploaderId && currentUser?.id !== video.uploaderId) {
+      await addDoc(collection(db, "notifications"), {
+        type: "like",
+        videoId: id,
+        fromUser: currentUser?.id || guestId,
+        message: `${getAuthorName(currentUser)} liked your video.`,
+        createdAt: Timestamp.now(),
+        read: false,
+        userId: video.uploaderId,
+      });
+    }
+  } catch (err) {
+    console.warn("Notification save failed:", err);
+  }
+};
+
 
   // Comment submit
   const handleCommentSubmit = async (e) => {
-    e.preventDefault();
-    if (!id || newComment.trim() === "") return;
-    await addDoc(collection(db, "videos", id, "comments"), {
-      text: newComment,
-      author: currentUser?.id || guestId,
-      authorName: getAuthorName(currentUser),
-      createdAt: Timestamp.now(),
-      replies: [],
-    });
-    setNewComment("");
-  };
+  e.preventDefault();
+  if (!id || newComment.trim() === "") return;
+
+  // 🧩 Ensure fields exist
+  await ensureVideoFields(id);
+
+  const commentRef = collection(db, "videos", id, "comments");
+  await addDoc(commentRef, {
+    text: newComment,
+    author: currentUser?.id || guestId,
+    authorName: getAuthorName(currentUser),
+    createdAt: Timestamp.now(),
+    replies: [],
+  });
+
+  setNewComment("");
+
+  // 🩷 Optional: notify uploader
+  try {
+    if (video?.uploaderId && currentUser?.id !== video.uploaderId) {
+      await addDoc(collection(db, "notifications"), {
+        type: "comment",
+        videoId: id,
+        fromUser: currentUser?.id || guestId,
+        message: `${getAuthorName(currentUser)} commented on your video.`,
+        createdAt: Timestamp.now(),
+        read: false,
+        userId: video.uploaderId,
+      });
+    }
+  } catch (err) {
+    console.warn("Notification save failed:", err);
+  }
+};
+
 
   // Outside click for share
   useEffect(() => {

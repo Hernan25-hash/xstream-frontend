@@ -27,6 +27,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Exclusive from "./components/Exclusive"; // ✅ New import
 import AdminUsers from "./admin/AdminUsers"; // ✅ New import
 
+
 // 🚦 Route guard for 18+ check + deep link awareness
 const RequireAwareness = ({ children }) => {
   const progress = localStorage.getItem("xstream-progress");
@@ -229,6 +230,7 @@ function AppContent() {
 
           {/* Default redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
+          
         </Routes>
       )}
     </div>

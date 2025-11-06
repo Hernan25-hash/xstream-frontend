@@ -46,22 +46,30 @@ const Related = ({ relatedVideos, currentVideoId, isCurrentExclusive = false }) 
             onClick={() => navigate(`/embed/${v.id}`)}
           >
             <div className="relative">
-              {v.thumbnail ? (
-                <img
-                  src={v.thumbnail}
-                  alt={v.description || "Video Thumbnail"}
-                  className="object-cover w-full aspect-video"
-                />
-              ) : (
-                <div className="w-full bg-black aspect-video" />
-              )}
+  {v.thumbnail ? (
+    <img
+      src={v.thumbnail}
+      alt={v.description || "Video Thumbnail"}
+      className="object-cover w-full aspect-video"
+    />
+  ) : (
+    <div className="w-full bg-black aspect-video" />
+  )}
 
-              {v.duration && (
-                <div className="absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded">
-                  {v.duration}
-                </div>
-              )}
-            </div>
+  {/* ✅ Add this — pink EXCLUSIVE badge */}
+  {v.exclusive && (
+    <span className="absolute top-0 right-0 px-2 py-1 text-[10px] font-semibold text-white bg-pink-600 rounded-bl-lg">
+      EXCLUSIVE
+    </span>
+  )}
+
+  {v.duration && (
+    <div className="absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 bg-black/60 rounded">
+      {v.duration}
+    </div>
+  )}
+</div>
+
 
             <div className="p-1.5">
               <div className="text-[10px] text-gray-300 line-clamp-2">{v.description}</div>
@@ -79,7 +87,7 @@ const Related = ({ relatedVideos, currentVideoId, isCurrentExclusive = false }) 
           className="w-full px-3 py-2 mt-2 text-xs font-semibold text-pink-500"
           onClick={() => setShowAll(true)}
         >
-          See More
+          Load More
         </button>
       )}
     </div>
