@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/xstream-frontend/', // 🔑 important for subdirectory deployment
   plugins: [
     react(),
     VitePWA({
@@ -22,8 +21,8 @@ export default defineConfig({
         background_color: '#000000',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/xstream-frontend/',      // 🔑 match base
-        start_url: '/xstream-frontend/',   // 🔑 match base
+        scope: '/',
+        start_url: '/',
         icons: [
           {
             src: '/android-chrome-192x192.png',
@@ -46,8 +45,8 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true, // 🧹 removes old caches when updating
-        clientsClaim: true,          // ensures SW controls all clients immediately
-        skipWaiting: true,           // forces update without manual reload
+        clientsClaim: true, // ensures SW controls all clients immediately
+        skipWaiting: true, // forces update without manual reload
         runtimeCaching: [
           {
             // 🖼️ Cache images
