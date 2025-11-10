@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Tell Google and others where your sitemap lives
+Sitemap: https://xsecrets.xyz/sitemap.xml
