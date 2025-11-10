@@ -1,0 +1,7 @@
+# Allow sitemap.xml and robots.txt to be served normally
+/sitemap.xml  /sitemap.xml  200
+/robots.txt   /robots.txt   200
+
+# All other routes go to index.html (for React routing)
+# Catch-all rule
+/*   /index.html   200
