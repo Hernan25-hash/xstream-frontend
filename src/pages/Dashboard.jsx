@@ -209,34 +209,52 @@ useEffect(() => {
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+
   return (
-    <nav className="flex justify-center mt-8">
-      <ul className="flex space-x-2">
+    <nav className="flex justify-center w-full mt-8">
+      <ul
+        className="flex max-w-full px-2 space-x-2 overflow-x-auto no-scrollbar"
+      >
         {currentPage > 1 && (
           <li>
-            <button onClick={() => onPageChange(currentPage - 1)} className="px-3 py-1 text-pink-600 transition border border-pink-600 rounded hover:bg-pink-600 hover:text-white">Prev</button>
+            <button
+              onClick={() => onPageChange(currentPage - 1)}
+              className="px-3 py-1 text-pink-600 transition border border-pink-600 rounded hover:bg-pink-600 hover:text-white"
+            >
+              Prev
+            </button>
           </li>
         )}
-        {pageNumbers.map(n => (
+
+        {pageNumbers.map((n) => (
           <li key={n}>
             <button
               onClick={() => onPageChange(n)}
               className={`px-3 py-1 border rounded transition ${
-                currentPage === n ? "bg-pink-600 text-white border-pink-600" : "border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white"
+                currentPage === n
+                  ? "bg-pink-600 text-white border-pink-600"
+                  : "border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white"
               }`}
             >
               {n}
             </button>
           </li>
         ))}
+
         {currentPage < totalPages && (
           <li>
-            <button onClick={() => onPageChange(currentPage + 1)} className="px-3 py-1 text-pink-600 transition border border-pink-600 rounded hover:bg-pink-600 hover:text-white">Next</button>
+            <button
+              onClick={() => onPageChange(currentPage + 1)}
+              className="px-3 py-1 text-pink-600 transition border border-pink-600 rounded hover:bg-pink-600 hover:text-white"
+            >
+              Next
+            </button>
           </li>
         )}
       </ul>
     </nav>
   );
 };
+
 
 export default Dashboard;
