@@ -19,6 +19,8 @@ import ReceiptModal from "../components/ReceiptModal";
 import Loading from "../components/Loading";
 import Transactions from "../components/Transactions";
 import { setExclusiveAccessStarted, initExclusiveVisibilityHandler } from "../utils/exclusiveAccess";
+import Banner from "../components/Banner";
+import Footer from "../components/Footer";
 
 const formatViews = (views) => {
   if (views >= 1_000_000) return (views / 1_000_000).toFixed(1) + "M";
@@ -290,7 +292,9 @@ useEffect(() => {
         ))}
       </select>
     </div>
+    
   </div>
+  <Banner/>
 
   {/* Filtered Videos */}
   {exclusiveVideos.length === 0 ? (
@@ -343,7 +347,7 @@ useEffect(() => {
                 </span>
               </div>
               <div className="px-2 py-3 text-sm">
-                <p className="mb-1 font-semibold text-pink-400 truncate">{v.category}</p>
+                
                 <p className="text-gray-300 truncate">{v.description}</p>
                 <div className="flex items-center justify-between mt-2 text-xs text-gray-400">
                   <span>{formatViews(v.views ?? 0)} views</span>
@@ -367,10 +371,14 @@ useEffect(() => {
             Load More
           </button>
         </div>
+        
       )}
+      
     </>
+    
   )}
 </div>
+<Footer/>
 
    
 {showTransactions && user?.uid && (
