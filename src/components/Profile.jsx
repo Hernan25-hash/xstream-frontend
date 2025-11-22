@@ -78,6 +78,26 @@ const Profile = () => {
         const userSnap = await getDoc(userRef);
         let userData = userSnap.exists() ? userSnap.data() : {};
 
+        // ⭐ Auto-reset if exclusive access already expired
+if (userData.exclusiveAccessExpiry) {
+  const now = Date.now();
+  const expiry = new Date(userData.exclusiveAccessExpiry).getTime();
+
+  if (now >= expiry) {
+    await updateDoc(userRef, {
+      exclusiveAccessRemaining: 0,
+      exclusiveAccessExpiry: null,
+      exclusiveAccessStarted: false,
+    });
+
+    // Ensure the UI also reflects reset values
+    userData.exclusiveAccessRemaining = 0;
+    userData.exclusiveAccessExpiry = null;
+    userData.exclusiveAccessStarted = false;
+  }
+}
+
+
         // Set defaults if missing
         const updateFields = {};
         if (!userData.accountType) updateFields.accountType = "free";
@@ -358,7 +378,8 @@ const Profile = () => {
             <h2 className="mb-4 text-xl font-bold text-pink-500">
               Favorite Videos
             </h2>
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
+
   {loadingFavorites
     ? Array.from({ length: videosPerPage }).map((_, idx) => (
         <VideoSkeleton key={idx} />
