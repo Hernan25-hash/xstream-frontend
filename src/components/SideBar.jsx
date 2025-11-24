@@ -110,6 +110,14 @@ const SideBar = ({ isOpen, setIsOpen }) => {
             <FaBullhorn className="text-xl" />
             <span>Exclusive</span>
           </button>
+          <button
+  onClick={() => handleNavigate("/livechat", "Live Chat")}
+  className="flex items-center gap-4 px-3 py-3 text-lg rounded-lg hover:bg-pink-600/70"
+>
+  <FaBullhorn className="text-xl" /> {/* You can choose another icon if you want */}
+  <span>Live Chat</span>
+</button>
+
         </div>
 
         {/* Footer */}

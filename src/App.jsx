@@ -24,9 +24,12 @@ import Settings from "./components/Settings";
 import Advertise from "./components/Advertise";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
-import Exclusive from "./components/Exclusive"; // ✅ New import
-import AdminUsers from "./admin/AdminUsers"; // ✅ New import
+import Exclusive from "./components/Exclusive";
+import AdminUsers from "./admin/AdminUsers";
 
+// ✅ Alias imports to avoid duplicate naming
+import LiveChatUser from "./components/LiveChatUser";  // user-facing
+import LiveChatAdmin from "./admin/LiveChat";      // admin panel
 
 // 🚦 Route guard for 18+ check + deep link awareness
 const RequireAwareness = ({ children }) => {
@@ -155,7 +158,7 @@ function AppContent() {
             }
           />
 
-          {/* ✅ Exclusive (New) */}
+          {/* Exclusive */}
           <Route
             path="/exclusive"
             element={
@@ -165,7 +168,17 @@ function AppContent() {
             }
           />
 
-          {/* Admin Protected */}
+          {/* User LiveChat */}
+          <Route
+            path="/livechat"
+            element={
+              <RequireAwareness>
+                <LiveChatUser />
+              </RequireAwareness>
+            }
+          />
+
+          {/* Admin Panel */}
           <Route
             path="/2admin"
             element={
@@ -175,15 +188,25 @@ function AppContent() {
             }
           />
 
-          {/* ✅ Admin Users Page */}
-<Route
-  path="/2admin/users"
-  element={
-    <ProtectedAdminRoute>
-      <AdminUsers />
-    </ProtectedAdminRoute>
-  }
-/>
+          {/* Admin Users */}
+          <Route
+            path="/2admin/users"
+            element={
+              <ProtectedAdminRoute>
+                <AdminUsers />
+              </ProtectedAdminRoute>
+            }
+          />
+
+          {/* Admin LiveChat */}
+          <Route
+            path="/2admin/livechat"
+            element={
+              <ProtectedAdminRoute>
+                <LiveChatAdmin />
+              </ProtectedAdminRoute>
+            }
+          />
 
           {/* Admin Login */}
           <Route path="/2login" element={<Login />} />
@@ -218,7 +241,7 @@ function AppContent() {
             }
           />
 
-          {/* ✅ Reset Password */}
+          {/* Reset Password */}
           <Route
             path="/reset-password"
             element={
@@ -230,14 +253,13 @@ function AppContent() {
 
           {/* Default redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
-          
         </Routes>
       )}
     </div>
   );
 }
 
-// ✅ RootApp wraps AppContent inside Router
+// Root app
 export default function RootApp() {
   return (
     <Router>

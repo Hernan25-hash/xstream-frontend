@@ -286,6 +286,7 @@ const EmbedPage = ({ user }) => {
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [favSuccess, setFavSuccess] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [liveChats, setLiveChats] = useState([]);
 
   // Exclusive states
   const [exclusiveAccessExpiry, setExclusiveAccessExpiry] = useState(null);
@@ -618,6 +619,7 @@ const ensureVideoFields = async (videoId) => {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
+
   const relatedVideos = videos
     .filter((v) => v.id !== id && v.category?.toLowerCase() === video?.category?.toLowerCase())
     .slice(0, 8);
@@ -807,6 +809,7 @@ const ensureVideoFields = async (videoId) => {
             />
           )}
         </div>
+        
 
         <Related
   relatedVideos={fallbackVideos}

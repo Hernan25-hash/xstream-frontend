@@ -51,11 +51,12 @@ const AdminUsers = () => {
         <h1 className="text-3xl font-bold text-pink-600">User Management</h1>
         <div className="flex gap-2">
           <button
-            onClick={() => navigate("/admin")}
-            className="px-4 py-2 text-sm transition bg-gray-800 border border-gray-700 rounded hover:bg-gray-700"
-          >
-            ← Back to Admin Panel
-          </button>
+  onClick={() => navigate(-1)}
+  className="px-4 py-2 text-sm transition bg-gray-800 border border-gray-700 rounded hover:bg-gray-700"
+>
+  ← Back
+</button>
+
          
         </div>
       </div>

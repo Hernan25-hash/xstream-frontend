@@ -48,6 +48,11 @@ const AdminPanel = () => {
   navigate("/2admin/users");
   setIsSidebarOpen(false); // close sidebar after navigation
 };
+const goToLiveChat = () => {
+  navigate("/2admin/livechat"); // make sure this route exists in your router
+  setIsSidebarOpen(false); // close sidebar after navigation
+};
+
 
 
   // 🔹 Fetch videos live
@@ -396,6 +401,14 @@ const AdminPanel = () => {
       <button className="w-full py-2 text-left text-gray-300 rounded hover:bg-gray-800">
         Report's
       </button>
+
+      {/* ✅ Live Chat Button */}
+  <button
+    onClick={goToLiveChat}
+    className="w-full py-2 text-left text-gray-300 rounded hover:bg-gray-800"
+  >
+    Live Chat
+  </button>
     </div>
 
     <div className="p-4 border-t border-gray-700">
